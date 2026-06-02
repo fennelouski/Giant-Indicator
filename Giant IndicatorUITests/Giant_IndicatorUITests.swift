@@ -8,6 +8,8 @@
 import XCTest
 
 final class Giant_IndicatorUITests: XCTestCase {
+    private let resetIndicatorPreferencesArgument = "--ui-testing-reset-indicator-preferences"
+    private let batteryLevelArgument = "--ui-testing-battery-level"
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -23,14 +25,54 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+    func testOpenAndCloseSettings() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let openSettingsButton = app.buttons["open-settings-button"]
+        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
+
+        openSettingsButton.tap()
+
+        let settingsView = app.otherElements["settings-view"]
+        XCTAssertTrue(settingsView.waitForExistence(timeout: 2))
+
+        app.buttons["Done"].tap()
+
+        XCTAssertFalse(settingsView.waitForExistence(timeout: 1))
+        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testIndicatorVisibilityPersistsAcrossRelaunch() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launch()
+
+        let openSettingsButton = app.buttons["open-settings-button"]
+        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
+        openSettingsButton.tap()
+
+        let batteryToggle = app.switches["indicator-toggle-battery"]
+        XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
+        XCTAssertEqual(batteryToggle.value as? String, "1")
+        batteryToggle.tap()
+        XCTAssertEqual(batteryToggle.value as? String, "0")
+
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.otherElements["indicator-tile-battery"].exists)
+
+        app.terminate()
+
+        app.launchArguments = []
+        app.launch()
+
+        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
+        openSettingsButton.tap()
+
+        XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
+        XCTAssertEqual(batteryToggle.value as? String, "0")
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.otherElements["indicator-tile-battery"].exists)
     }
 
     @MainActor
@@ -39,5 +81,27 @@ final class Giant_IndicatorUITests: XCTestCase {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
+    }
+
+    @MainActor
+    func testBatteryTileShowsConfiguredPercentage() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [batteryLevelArgument, "64"]
+        app.launch()
+
+        let batteryTile = app.otherElements["indicator-tile-battery"]
+        XCTAssertTrue(batteryTile.waitForExistence(timeout: 2))
+
+        let percentageLabel = app.staticTexts["battery-percentage-label"]
+        XCTAssertTrue(percentageLabel.waitForExistence(timeout: 2))
+        XCTAssertEqual(percentageLabel.label, "64%")
+    }
+
+    private func configuredApp(resetIndicatorPreferences: Bool) -> XCUIApplication {
+        let app = XCUIApplication()
+        if resetIndicatorPreferences {
+            app.launchArguments = [resetIndicatorPreferencesArgument]
+        }
+        return app
     }
 }

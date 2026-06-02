@@ -1,28 +1,80 @@
 import SwiftUI
 
 struct ContentView: View {
-    private let placeholders: [IndicatorPlaceholder] = [
-        .init(title: "Battery", value: "87%", symbol: "battery.75"),
-        .init(title: "Volume", value: "42%", symbol: "speaker.wave.2.fill"),
-        .init(title: "Playback", value: "Playing", symbol: "play.fill")
-    ]
+    @EnvironmentObject private var weatherViewModel: WeatherViewModel
+    @State private var isSettingsPresented = false
+    @State private var indicatorVisibility: [IndicatorKind: Bool] = IndicatorPreferences.loadVisibility()
+    @StateObject private var batteryViewModel = BatteryViewModel()
+
+    private var indicators: [IndicatorPlaceholder] {
+        [
+            .init(kind: .battery, value: "87%"),
+            .init(kind: .volume, value: "42%"),
+            .init(kind: .playback, value: "Playing"),
+            .init(kind: .wifi, value: "Connected"),
+            .init(kind: .speaker, value: "Speaker"),
+            .init(kind: .bluetooth, value: "On"),
+            .init(kind: .ringer, value: "Ring"),
+            .fromWeatherState(weatherViewModel.displayState)
+        ]
+    }
+
+    private var visibleIndicators: [IndicatorPlaceholder] {
+        indicators.filter { isIndicatorVisible($0.kind) }
+    }
 
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            GeometryReader { proxy in
-                let columns = gridColumns(for: proxy.size.width)
-
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(placeholders) { placeholder in
-                        IndicatorTile(placeholder: placeholder)
-                    }
+            if visibleIndicators.isEmpty {
+                EmptyIndicatorsView {
+                    isSettingsPresented = true
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                GeometryReader { proxy in
+                    let columns = gridColumns(for: proxy.size.width)
+
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(visibleIndicators) { placeholder in
+                            if placeholder.kind == .battery {
+                                BatteryIndicatorTile(batteryState: batteryViewModel.state)
+                            } else {
+                                IndicatorTile(placeholder: placeholder)
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
             }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                isSettingsPresented = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.12), in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+            .padding(.trailing, 16)
+            .accessibilityLabel("Open Settings")
+            .accessibilityIdentifier("open-settings-button")
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsView(
+                indicatorVisibility: $indicatorVisibility,
+                indicatorKinds: IndicatorKind.allCases
+            )
         }
     }
 
@@ -34,13 +86,215 @@ struct ContentView: View {
             count: count
         )
     }
+
+    private func isIndicatorVisible(_ kind: IndicatorKind) -> Bool {
+        indicatorVisibility[kind, default: true]
+    }
+
+}
+
+private struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var indicatorVisibility: [IndicatorKind: Bool]
+    let indicatorKinds: [IndicatorKind]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Visible Indicators") {
+                    ForEach(indicatorKinds) { kind in
+                        Toggle(isOn: binding(for: kind)) {
+                            Label(kind.displayName, systemImage: kind.symbol)
+                        }
+                        .accessibilityIdentifier("indicator-toggle-\(kind.rawValue)")
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("settings-view")
+    }
+
+    private func binding(for kind: IndicatorKind) -> Binding<Bool> {
+        Binding(
+            get: { indicatorVisibility[kind, default: true] },
+            set: { newValue in
+                indicatorVisibility[kind] = newValue
+                IndicatorPreferences.setVisibility(newValue, for: kind)
+            }
+        )
+    }
+}
+
+enum IndicatorKind: String, CaseIterable, Identifiable {
+    case weather
+    case battery
+    case volume
+    case playback
+    case wifi
+    case speaker
+    case bluetooth
+    case ringer
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .weather:
+            return "Weather"
+        case .battery:
+            return "Battery"
+        case .volume:
+            return "Volume"
+        case .playback:
+            return "Playback"
+        case .wifi:
+            return "Wi-Fi"
+        case .speaker:
+            return "Speaker/Output"
+        case .bluetooth:
+            return "Bluetooth"
+        case .ringer:
+            return "Ringer/Silent"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .weather:
+            return "cloud.sun.fill"
+        case .battery:
+            return "battery.75"
+        case .volume:
+            return "speaker.wave.2.fill"
+        case .playback:
+            return "play.fill"
+        case .wifi:
+            return "wifi"
+        case .speaker:
+            return "hifispeaker.fill"
+        case .bluetooth:
+            return "dot.radiowaves.left.and.right"
+        case .ringer:
+            return "bell.fill"
+        }
+    }
+
+    static var defaultVisibilityState: [IndicatorKind: Bool] {
+        Dictionary(uniqueKeysWithValues: allCases.map { ($0, true) })
+    }
+
+    var visibilityStorageKey: String {
+        "indicator.visibility.\(rawValue)"
+    }
 }
 
 private struct IndicatorPlaceholder: Identifiable {
-    let id = UUID()
-    let title: String
+    let kind: IndicatorKind
     let value: String
-    let symbol: String
+    var subtitle: String?
+    var attribution: WeatherAttributionData?
+
+    var id: IndicatorKind { kind }
+    var title: String { kind.displayName }
+    var symbol: String { kind.symbol }
+
+    static func fromWeatherState(_ state: WeatherDisplayState) -> IndicatorPlaceholder {
+        guard let snapshot = state.snapshot else {
+            return IndicatorPlaceholder(
+                kind: .weather,
+                value: state.errorMessage ?? "Loading…",
+                subtitle: "Current Location",
+                attribution: nil
+            )
+        }
+
+        let measurement = Measurement(value: snapshot.temperatureCelsius, unit: UnitTemperature.celsius)
+        let formatter = MeasurementFormatter()
+        formatter.unitOptions = .providedUnit
+        formatter.unitStyle = .short
+        let value = formatter.string(from: measurement)
+
+        var subtitle = snapshot.conditionDescription
+        if let source = state.source {
+            let sourceText = source == .fresh ? "Fresh" : "Cached"
+            subtitle = "\(subtitle) · \(sourceText)"
+        }
+
+        return IndicatorPlaceholder(
+            kind: .weather,
+            value: value,
+            subtitle: subtitle,
+            attribution: state.attribution
+        )
+    }
+}
+
+enum IndicatorPreferences {
+    static let defaults = UserDefaults.standard
+
+    static var allVisibilityKeys: [String] {
+        IndicatorKind.allCases.map(\.visibilityStorageKey)
+    }
+
+    static func loadVisibility() -> [IndicatorKind: Bool] {
+        var visibility = IndicatorKind.defaultVisibilityState
+
+        for kind in IndicatorKind.allCases {
+            let key = kind.visibilityStorageKey
+            if defaults.object(forKey: key) != nil {
+                visibility[kind] = defaults.bool(forKey: key)
+            }
+        }
+
+        return visibility
+    }
+
+    static func setVisibility(_ isVisible: Bool, for kind: IndicatorKind) {
+        defaults.set(isVisible, forKey: kind.visibilityStorageKey)
+    }
+
+    static func resetVisibility() {
+        allVisibilityKeys.forEach(defaults.removeObject(forKey:))
+    }
+}
+
+private struct EmptyIndicatorsView: View {
+    let openSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 60, weight: .bold))
+                .foregroundStyle(.white.opacity(0.8))
+
+            Text("No indicators enabled")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+
+            Text("Open Settings to choose indicators.")
+                .font(.system(size: 20, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.78))
+                .multilineTextAlignment(.center)
+
+            Button("Open Settings") {
+                openSettings()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.white.opacity(0.2))
+            .foregroundStyle(.white)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 }
 
 private struct IndicatorTile: View {
@@ -63,9 +317,21 @@ private struct IndicatorTile: View {
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+
+            if let subtitle = placeholder.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+
+            if let attribution = placeholder.attribution {
+                WeatherAttributionView(attribution: attribution)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
         .padding(24)
+        .accessibilityIdentifier("indicator-tile-\(placeholder.kind.rawValue)")
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color.white.opacity(0.08))
@@ -77,10 +343,93 @@ private struct IndicatorTile: View {
     }
 }
 
+private struct BatteryIndicatorTile: View {
+    let batteryState: BatteryState
+
+    var body: some View {
+        VStack(spacing: 20) {
+            BatteryIcon(level: batteryState.normalizedLevel)
+                .frame(height: 82)
+                .padding(.horizontal, 8)
+
+            if batteryState.isAvailable {
+                Text(batteryState.percentageText)
+                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("battery-percentage-label")
+            } else {
+                Text("--")
+                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier("battery-percentage-label")
+
+                Text(batteryState.unavailableReason)
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("battery-unavailable-label")
+            }
+
+            Text("Battery")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding(24)
+        .accessibilityIdentifier("indicator-tile-battery")
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct BatteryIcon: View {
+    let level: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            let capWidth = max(12, proxy.size.width * 0.05)
+            let shellWidth = max(16, proxy.size.width - capWidth - 10)
+            let strokeWidth: CGFloat = 4
+            let contentPadding = strokeWidth + 5
+            let contentWidth = max(0, shellWidth - contentPadding * 2)
+            let clampedLevel = min(max(level, 0), 1)
+
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white, lineWidth: strokeWidth)
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white)
+                            .frame(width: contentWidth * clampedLevel)
+                            .padding(contentPadding)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(width: shellWidth)
+
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.white)
+                    .frame(width: capWidth, height: max(18, proxy.size.height * 0.42))
+            }
+        }
+    }
+}
+
 #Preview("Dashboard") {
     ContentView()
+        .environmentObject(WeatherViewModel())
 }
 
 #Preview("Compact Dashboard", traits: .fixedLayout(width: 350, height: 750)) {
     ContentView()
+        .environmentObject(WeatherViewModel())
 }
