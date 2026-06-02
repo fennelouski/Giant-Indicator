@@ -8,9 +8,21 @@
 import Testing
 import Foundation
 import CoreLocation
+import Combine
 @testable import Giant_Indicator
 
 struct Giant_IndicatorTests {
+    private final class BatteryProviderMock: BatteryStateProviding {
+        let subject: CurrentValueSubject<BatteryState, Never>
+
+        init(initialState: BatteryState) {
+            self.subject = CurrentValueSubject(initialState)
+        }
+
+        func batteryStatePublisher() -> AnyPublisher<BatteryState, Never> {
+            subject.eraseToAnyPublisher()
+        }
+    }
 
     @Test func weatherCachePolicy_refreshWhenNoPriorFetch() async throws {
         #expect(WeatherCachePolicy.shouldRefresh(lastFetchAt: nil, now: Date(timeIntervalSince1970: 10)))
@@ -77,6 +89,26 @@ struct Giant_IndicatorTests {
         #expect(provider.userVisibleErrorMessage(.restricted) == "Location access is restricted on this device.")
         #expect(provider.userVisibleErrorMessage(.unavailable) == "Location unavailable.")
         #expect(provider.userVisibleErrorMessage(.authorized(CLLocation(latitude: 0, longitude: 0))) == nil)
+    }
+
+    @MainActor
+    @Test func batteryViewModel_onlyPublishesWhenStateChanges() async throws {
+        let initial = BatteryState.unavailable
+        let changed = BatteryState(percentage: 55, availability: .available)
+        let provider = BatteryProviderMock(initialState: initial)
+        let viewModel = BatteryViewModel(provider: provider)
+        var emittedStates = [BatteryState]()
+        let cancellable = viewModel.$state
+            .dropFirst()
+            .sink { emittedStates.append($0) }
+        defer { cancellable.cancel() }
+
+        provider.subject.send(initial)
+        provider.subject.send(initial)
+        provider.subject.send(changed)
+        provider.subject.send(changed)
+
+        #expect(emittedStates == [changed])
     }
 
 }

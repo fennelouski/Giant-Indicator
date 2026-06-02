@@ -17,7 +17,8 @@ final class PlaybackViewModel: ObservableObject {
         provider.playbackStatePublisher()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
-                self?.state = state
+                guard let self, self.state != state else { return }
+                self.state = state
             }
             .store(in: &cancellables)
     }

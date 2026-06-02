@@ -17,7 +17,8 @@ final class BatteryViewModel: ObservableObject {
         provider.batteryStatePublisher()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
-                self?.state = state
+                guard let self, self.state != state else { return }
+                self.state = state
             }
             .store(in: &cancellables)
     }

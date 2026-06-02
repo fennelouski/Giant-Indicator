@@ -30,6 +30,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     private var bluetoothSymbol = "bolt.horizontal.slash"
     private var bluetoothAvailability: ConnectivityAvailability = .available
     private var cancellables = Set<AnyCancellable>()
+    private var hasStartedMonitoring = false
 
     init(processInfo: ProcessInfo = .processInfo) {
         self.processInfo = processInfo
@@ -48,6 +49,9 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     }
 
     private func startMonitoring() {
+        guard !hasStartedMonitoring else { return }
+        hasStartedMonitoring = true
+
         wifiMonitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
             self.wifiConnected = path.status == .satisfied
@@ -79,14 +83,15 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         let bluetoothState = makeBluetoothState()
         let ringerState = makeRingerState()
 
-        subject.send(
-            ConnectivityState(
-                wifi: wifiState,
-                speaker: speakerState,
-                bluetooth: bluetoothState,
-                ringer: ringerState
-            )
+        let snapshot = ConnectivityState(
+            wifi: wifiState,
+            speaker: speakerState,
+            bluetooth: bluetoothState,
+            ringer: ringerState
         )
+
+        guard subject.value != snapshot else { return }
+        subject.send(snapshot)
     }
 
     private func makeWiFiState() -> ConnectivityIndicatorState {

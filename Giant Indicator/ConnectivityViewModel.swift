@@ -17,7 +17,8 @@ final class ConnectivityViewModel: ObservableObject {
         provider.connectivityPublisher()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newState in
-                self?.state = newState
+                guard let self, self.state != newState else { return }
+                self.state = newState
             }
             .store(in: &cancellables)
     }
