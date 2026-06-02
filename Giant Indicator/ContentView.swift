@@ -57,29 +57,23 @@ struct ContentView: View {
                 }
             } else {
                 GeometryReader { proxy in
-                    let columns = gridColumns(for: proxy.size.width)
+                    let layout = MasonryLayoutPlan.build(
+                        indicators: visibleIndicators,
+                        in: proxy.size
+                    )
 
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(visibleIndicators) { placeholder in
-                            if placeholder.kind == .battery {
-                                BatteryIndicatorTile(batteryState: batteryViewModel.state)
-                            } else if placeholder.kind == .volume {
-                                VolumeIndicatorTile(volumeState: volumeViewModel.state)
-                            } else if placeholder.kind == .playback {
-                                PlaybackIndicatorTile(playbackState: playbackViewModel.state)
-                            } else if
-                                placeholder.kind == .wifi ||
-                                placeholder.kind == .speaker ||
-                                placeholder.kind == .bluetooth ||
-                                placeholder.kind == .ringer
-                            {
-                                ConnectivityIndicatorTile(placeholder: placeholder)
-                            } else {
-                                IndicatorTile(placeholder: placeholder)
+                    HStack(alignment: .top, spacing: layout.spacing) {
+                        ForEach(Array(layout.columns.enumerated()), id: \.offset) { _, column in
+                            VStack(spacing: layout.spacing) {
+                                ForEach(column.items) { item in
+                                    tileView(for: item.placeholder)
+                                        .frame(height: item.height)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .top)
                         }
                     }
-                    .padding(20)
+                    .padding(layout.outerPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 }
             }
@@ -112,19 +106,162 @@ struct ContentView: View {
         }
     }
 
-    private func gridColumns(for width: CGFloat) -> [GridItem] {
-        let desiredTileWidth: CGFloat = 220
-        let count = max(Int(width / desiredTileWidth), 1)
-        return Array(
-            repeating: GridItem(.flexible(minimum: 160, maximum: 420), spacing: 16),
-            count: count
-        )
-    }
-
     private func isIndicatorVisible(_ kind: IndicatorKind) -> Bool {
         indicatorVisibility[kind, default: true]
     }
 
+    @ViewBuilder
+    private func tileView(for placeholder: IndicatorPlaceholder) -> some View {
+        if placeholder.kind == .battery {
+            BatteryIndicatorTile(batteryState: batteryViewModel.state)
+        } else if placeholder.kind == .volume {
+            VolumeIndicatorTile(volumeState: volumeViewModel.state)
+        } else if placeholder.kind == .playback {
+            PlaybackIndicatorTile(playbackState: playbackViewModel.state)
+        } else if
+            placeholder.kind == .wifi ||
+            placeholder.kind == .speaker ||
+            placeholder.kind == .bluetooth ||
+            placeholder.kind == .ringer
+        {
+            ConnectivityIndicatorTile(placeholder: placeholder)
+        } else {
+            IndicatorTile(placeholder: placeholder)
+        }
+    }
+}
+
+private struct MasonryLayoutPlan {
+    struct Item: Identifiable {
+        let placeholder: IndicatorPlaceholder
+        let height: CGFloat
+
+        var id: IndicatorKind { placeholder.kind }
+    }
+
+    struct Column {
+        var items: [Item]
+    }
+
+    let columns: [Column]
+    let spacing: CGFloat
+    let outerPadding: CGFloat
+
+    static func build(indicators: [IndicatorPlaceholder], in size: CGSize) -> MasonryLayoutPlan {
+        let outerPadding: CGFloat = 20
+        let spacing: CGFloat = 16
+        let availableWidth = max(size.width - (outerPadding * 2), 1)
+        let availableHeight = max(size.height - (outerPadding * 2), 1)
+        let maxColumnsByWidth = max(Int((availableWidth + spacing) / (160 + spacing)), 1)
+        let maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
+
+        var bestCandidate: LayoutCandidate?
+        for columnCount in 1...maxColumns {
+            guard let candidate = makeCandidate(
+                indicators: indicators,
+                columnCount: columnCount,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight,
+                spacing: spacing
+            ) else {
+                continue
+            }
+
+            if let currentBest = bestCandidate {
+                if candidate.score > currentBest.score {
+                    bestCandidate = candidate
+                }
+            } else {
+                bestCandidate = candidate
+            }
+        }
+
+        let resolved = bestCandidate ?? fallbackCandidate(
+            indicators: indicators,
+            availableHeight: availableHeight,
+            spacing: spacing
+        )
+        return MasonryLayoutPlan(columns: resolved.columns, spacing: spacing, outerPadding: outerPadding)
+    }
+
+    private struct LayoutCandidate {
+        let columns: [Column]
+        let score: CGFloat
+    }
+
+    private static func makeCandidate(
+        indicators: [IndicatorPlaceholder],
+        columnCount: Int,
+        availableWidth: CGFloat,
+        availableHeight: CGFloat,
+        spacing: CGFloat
+    ) -> LayoutCandidate? {
+        guard columnCount > 0 else { return nil }
+
+        let tileWidth = (availableWidth - (spacing * CGFloat(columnCount - 1))) / CGFloat(columnCount)
+        guard tileWidth >= 140 else { return nil }
+
+        var columnHeights = Array(repeating: CGFloat(0), count: columnCount)
+        var columns = Array(repeating: [IndicatorPlaceholder](), count: columnCount)
+
+        for indicator in indicators {
+            let target = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
+            let baseHeight = preferredTileHeight(for: indicator.kind)
+            if !columns[target].isEmpty {
+                columnHeights[target] += spacing
+            }
+            columnHeights[target] += baseHeight
+            columns[target].append(indicator)
+        }
+
+        let maxColumnHeight = columnHeights.max() ?? 1
+        let scale = min(max(availableHeight / maxColumnHeight, 0.52), 1.0)
+        let minimumHeight: CGFloat = 130
+
+        let builtColumns = columns.map { column in
+            Column(
+                items: column.map { placeholder in
+                    let scaledHeight = preferredTileHeight(for: placeholder.kind) * scale
+                    return Item(
+                        placeholder: placeholder,
+                        height: max(minimumHeight, scaledHeight)
+                    )
+                }
+            )
+        }
+
+        let score = (scale * 10_000) + tileWidth
+        return LayoutCandidate(columns: builtColumns, score: score)
+    }
+
+    private static func fallbackCandidate(
+        indicators: [IndicatorPlaceholder],
+        availableHeight: CGFloat,
+        spacing: CGFloat
+    ) -> LayoutCandidate {
+        let count = max(indicators.count, 1)
+        let totalSpacing = spacing * CGFloat(max(count - 1, 0))
+        let height = max((availableHeight - totalSpacing) / CGFloat(count), 130)
+        let column = Column(
+            items: indicators.map { Item(placeholder: $0, height: height) }
+        )
+        return LayoutCandidate(columns: [column], score: 0)
+    }
+
+    private static func preferredTileHeight(for kind: IndicatorKind) -> CGFloat {
+        switch kind {
+        case .weather:
+            return 300
+        case .battery:
+            return 250
+        case .volume:
+            return 250
+        case .playback:
+            return 250
+        case .wifi, .speaker, .bluetooth, .ringer:
+            return 220
+        }
+    }
 }
 
 private struct SettingsView: View {
@@ -378,7 +515,7 @@ private struct IndicatorTile: View {
                 WeatherAttributionView(attribution: attribution)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-\(placeholder.kind.rawValue)")
         .background(
@@ -426,7 +563,7 @@ private struct ConnectivityIndicatorTile: View {
                     .accessibilityIdentifier("\(placeholder.kind.rawValue)-subtitle-label")
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-\(placeholder.kind.rawValue)")
         .background(
@@ -475,7 +612,7 @@ private struct BatteryIndicatorTile: View {
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-battery")
         .background(
@@ -556,7 +693,7 @@ private struct VolumeIndicatorTile: View {
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-volume")
         .background(
@@ -602,7 +739,7 @@ private struct PlaybackIndicatorTile: View {
                 .minimumScaleFactor(0.7)
                 .accessibilityIdentifier("playback-subtitle-label")
         }
-        .frame(maxWidth: .infinity, minHeight: 220)
+        .frame(maxWidth: .infinity)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-playback")
         .background(
