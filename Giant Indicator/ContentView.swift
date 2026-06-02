@@ -6,12 +6,13 @@ struct ContentView: View {
     @State private var indicatorVisibility: [IndicatorKind: Bool] = IndicatorPreferences.loadVisibility()
     @StateObject private var batteryViewModel = BatteryViewModel()
     @StateObject private var volumeViewModel = VolumeViewModel()
+    @StateObject private var playbackViewModel = PlaybackViewModel()
 
     private var indicators: [IndicatorPlaceholder] {
         [
             .init(kind: .battery, value: batteryViewModel.state.percentageText),
             .init(kind: .volume, value: volumeViewModel.state.percentageText),
-            .init(kind: .playback, value: "Playing"),
+            .init(kind: .playback, value: playbackViewModel.state.titleText),
             .init(kind: .wifi, value: "Connected"),
             .init(kind: .speaker, value: "Speaker"),
             .init(kind: .bluetooth, value: "On"),
@@ -43,6 +44,8 @@ struct ContentView: View {
                                 BatteryIndicatorTile(batteryState: batteryViewModel.state)
                             } else if placeholder.kind == .volume {
                                 VolumeIndicatorTile(volumeState: volumeViewModel.state)
+                            } else if placeholder.kind == .playback {
+                                PlaybackIndicatorTile(playbackState: playbackViewModel.state)
                             } else {
                                 IndicatorTile(placeholder: placeholder)
                             }
@@ -211,10 +214,22 @@ private struct IndicatorPlaceholder: Identifiable {
 
     static func fromWeatherState(_ state: WeatherDisplayState) -> IndicatorPlaceholder {
         guard let snapshot = state.snapshot else {
+            let subtitle: String
+            switch state.permissionState {
+            case .denied:
+                subtitle = "Location access is off"
+            case .restricted:
+                subtitle = "Location access is restricted"
+            case .unavailable:
+                subtitle = "Location currently unavailable"
+            case .authorized, .none:
+                subtitle = "Current Location"
+            }
+
             return IndicatorPlaceholder(
                 kind: .weather,
                 value: state.errorMessage ?? "Loading…",
-                subtitle: "Current Location",
+                subtitle: subtitle,
                 attribution: nil
             )
         }
@@ -314,6 +329,7 @@ private struct IndicatorTile: View {
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
+                .accessibilityIdentifier("\(placeholder.kind.rawValue)-value-label")
 
             Text(placeholder.title)
                 .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -326,6 +342,7 @@ private struct IndicatorTile: View {
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("\(placeholder.kind.rawValue)-subtitle-label")
             }
 
             if let attribution = placeholder.attribution {
@@ -465,6 +482,52 @@ private struct VolumeIndicatorTile: View {
         .frame(maxWidth: .infinity, minHeight: 220)
         .padding(24)
         .accessibilityIdentifier("indicator-tile-volume")
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct PlaybackIndicatorTile: View {
+    let playbackState: PlaybackState
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: playbackState.symbolName)
+                .font(.system(size: 68, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(height: 82)
+                .padding(.horizontal, 8)
+                .accessibilityHidden(true)
+
+            Text(playbackState.titleText)
+                .font(.system(size: 52, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .accessibilityIdentifier("playback-state-label")
+
+            Text("Playback")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+
+            Text(playbackState.subtitleText)
+                .font(.system(size: 18, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .accessibilityIdentifier("playback-subtitle-label")
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding(24)
+        .accessibilityIdentifier("indicator-tile-playback")
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color.white.opacity(0.08))

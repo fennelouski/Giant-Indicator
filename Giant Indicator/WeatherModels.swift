@@ -28,16 +28,25 @@ enum WeatherDataSource: Equatable {
     case cached
 }
 
+enum WeatherPermissionState: Equatable {
+    case authorized
+    case denied
+    case restricted
+    case unavailable
+}
+
 struct WeatherDisplayState: Equatable {
     var snapshot: WeatherSnapshot?
     var attribution: WeatherAttributionData?
     var source: WeatherDataSource?
     var errorMessage: String?
+    var permissionState: WeatherPermissionState?
 
     static let empty = WeatherDisplayState(
         snapshot: nil,
         attribution: nil,
         source: nil,
-        errorMessage: nil
+        errorMessage: nil,
+        permissionState: nil
     )
 }

@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import CoreLocation
 @testable import Giant_Indicator
 
 struct Giant_IndicatorTests {
@@ -60,6 +61,22 @@ struct Giant_IndicatorTests {
         let width = battery.fillWidth(in: 240)
 
         #expect(width == 60)
+    }
+
+    @Test func weatherLocationProvider_mapsPermissionStates() async throws {
+        let provider = WeatherLocationProvider()
+        #expect(provider.permissionState(from: .denied) == .denied)
+        #expect(provider.permissionState(from: .restricted) == .restricted)
+        #expect(provider.permissionState(from: .unavailable) == .unavailable)
+    }
+
+    @Test func weatherLocationProvider_exposesUserFacingMessages() async throws {
+        let provider = WeatherLocationProvider()
+
+        #expect(provider.userVisibleErrorMessage(.denied) == "Location access denied. Enable Location Services for local weather.")
+        #expect(provider.userVisibleErrorMessage(.restricted) == "Location access is restricted on this device.")
+        #expect(provider.userVisibleErrorMessage(.unavailable) == "Location unavailable.")
+        #expect(provider.userVisibleErrorMessage(.authorized(CLLocation(latitude: 0, longitude: 0))) == nil)
     }
 
 }

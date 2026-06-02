@@ -5,33 +5,43 @@ struct WeatherAttributionView: View {
     let attribution: WeatherAttributionData
 
     var body: some View {
-        Group {
-            if let legalPageURL = attribution.legalPageURL {
-                HStack(spacing: 8) {
-                    if let markURL {
-                        AsyncImage(url: markURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 18)
-                            default:
-                                Image(systemName: "cloud.sun")
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.8))
-                            }
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                if let markURL {
+                    AsyncImage(url: markURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 18)
+                        default:
+                            Text("Apple Weather")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.8))
                         }
                     }
-
+                } else {
+                    Text("Apple Weather")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                if let legalPageURL = attribution.legalPageURL {
                     Link("Weather data attribution", destination: legalPageURL)
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.8))
                 }
-            } else if let legalText = attribution.legalAttributionText, !legalText.isEmpty {
+            }
+
+            if let legalText = attribution.legalAttributionText, !legalText.isEmpty {
                 Text(legalText)
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
+            } else if attribution.legalPageURL == nil {
+                Text("Weather data by Apple Weather and data providers.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
             }
         }
