@@ -5,11 +5,12 @@ struct ContentView: View {
     @State private var isSettingsPresented = false
     @State private var indicatorVisibility: [IndicatorKind: Bool] = IndicatorPreferences.loadVisibility()
     @StateObject private var batteryViewModel = BatteryViewModel()
+    @StateObject private var volumeViewModel = VolumeViewModel()
 
     private var indicators: [IndicatorPlaceholder] {
         [
-            .init(kind: .battery, value: "87%"),
-            .init(kind: .volume, value: "42%"),
+            .init(kind: .battery, value: batteryViewModel.state.percentageText),
+            .init(kind: .volume, value: volumeViewModel.state.percentageText),
             .init(kind: .playback, value: "Playing"),
             .init(kind: .wifi, value: "Connected"),
             .init(kind: .speaker, value: "Speaker"),
@@ -40,6 +41,8 @@ struct ContentView: View {
                         ForEach(visibleIndicators) { placeholder in
                             if placeholder.kind == .battery {
                                 BatteryIndicatorTile(batteryState: batteryViewModel.state)
+                            } else if placeholder.kind == .volume {
+                                VolumeIndicatorTile(volumeState: volumeViewModel.state)
                             } else {
                                 IndicatorTile(placeholder: placeholder)
                             }
@@ -421,6 +424,87 @@ private struct BatteryIcon: View {
                     .frame(width: capWidth, height: max(18, proxy.size.height * 0.42))
             }
         }
+    }
+}
+
+private struct VolumeIndicatorTile: View {
+    let volumeState: VolumeState
+
+    var body: some View {
+        VStack(spacing: 20) {
+            VolumeIcon(level: volumeState.normalizedLevel, symbolName: volumeState.symbolName)
+                .frame(height: 82)
+                .padding(.horizontal, 8)
+
+            if volumeState.isAvailable {
+                Text(volumeState.percentageText)
+                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("volume-percentage-label")
+            } else {
+                Text("--")
+                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier("volume-percentage-label")
+
+                Text(volumeState.unavailableReason)
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("volume-unavailable-label")
+            }
+
+            Text("Volume")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding(24)
+        .accessibilityIdentifier("indicator-tile-volume")
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct VolumeIcon: View {
+    let level: CGFloat
+    let symbolName: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            let iconAreaWidth = proxy.size.width * 0.34
+            let barAreaWidth = max(0, proxy.size.width - iconAreaWidth - 16)
+            let clampedLevel = min(max(level, 0), 1)
+            let barHeight = max(18, proxy.size.height * 0.28)
+
+            HStack(spacing: 16) {
+                Image(systemName: symbolName)
+                    .font(.system(size: max(26, proxy.size.height * 0.5), weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: iconAreaWidth, alignment: .leading)
+
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
+                        .fill(Color.white.opacity(0.18))
+
+                    RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
+                        .fill(Color.white)
+                        .frame(width: barAreaWidth * clampedLevel)
+                }
+                .frame(width: barAreaWidth, height: barHeight)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
