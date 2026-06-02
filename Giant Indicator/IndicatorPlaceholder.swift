@@ -13,30 +13,54 @@ struct IndicatorPlaceholder: Identifiable {
     var subtitle: String?
     var attribution: WeatherAttributionData?
     var symbolOverride: String? = nil
+    var showsUnavailableFallback: Bool = false
 
     var id: IndicatorKind { kind }
     var title: String { kind.displayName }
     var symbol: String { symbolOverride ?? kind.symbol }
 
+    static func fromConnectivityIndicator(
+        _ indicator: ConnectivityIndicatorState,
+        kind: IndicatorKind
+    ) -> IndicatorPlaceholder {
+        IndicatorPlaceholder(
+            kind: kind,
+            value: indicator.displayValueText,
+            subtitle: indicator.subtitleText,
+            symbolOverride: indicator.symbolName,
+            showsUnavailableFallback: !indicator.isDataAvailable
+        )
+    }
+
     static func fromWeatherState(_ state: WeatherDisplayState) -> IndicatorPlaceholder {
         guard let snapshot = state.snapshot else {
             let subtitle: String
+            let symbolName: String
             switch state.permissionState {
             case .denied:
                 subtitle = "Location access is off"
+                symbolName = "location.slash.fill"
             case .restricted:
                 subtitle = "Location access is restricted"
+                symbolName = "location.slash.fill"
             case .unavailable:
                 subtitle = "Location currently unavailable"
+                symbolName = "location.slash.fill"
             case .authorized, .none:
                 subtitle = "Current Location"
+                symbolName = "cloud.sun.fill"
             }
+
+            let isLoading = state.errorMessage == nil && state.permissionState != .denied &&
+                state.permissionState != .restricted && state.permissionState != .unavailable
 
             return IndicatorPlaceholder(
                 kind: .weather,
-                value: state.errorMessage ?? "Loading…",
-                subtitle: subtitle,
-                attribution: nil
+                value: state.errorMessage ?? IndicatorFallbackPresentation.unknownValueText,
+                subtitle: isLoading ? "Loading…" : subtitle,
+                attribution: nil,
+                symbolOverride: symbolName,
+                showsUnavailableFallback: !isLoading
             )
         }
 

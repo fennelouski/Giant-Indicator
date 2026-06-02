@@ -5,7 +5,7 @@ enum BatteryAvailability: Equatable {
     case unavailable(reason: String)
 }
 
-struct BatteryState: Equatable {
+struct BatteryState: Equatable, IndicatorUnavailablePresenting {
     let percentage: Int
     let availability: BatteryAvailability
 
@@ -17,19 +17,25 @@ struct BatteryState: Equatable {
         "\(percentage.clamped(to: 0...100))%"
     }
 
-    var isAvailable: Bool {
+    var isAvailable: Bool { isDataAvailable }
+
+    var isDataAvailable: Bool {
         if case .available = availability {
             return true
         }
         return false
     }
 
-    var unavailableReason: String {
+    var unavailableReason: String { unavailableReasonText }
+
+    var unavailableReasonText: String {
         if case .unavailable(let reason) = availability {
             return reason
         }
         return ""
     }
+
+    var unavailableSymbolName: String { "batteryblock.slash" }
 
     func fillWidth(in totalWidth: CGFloat) -> CGFloat {
         max(0, totalWidth) * normalizedLevel

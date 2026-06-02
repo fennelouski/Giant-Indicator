@@ -5,7 +5,7 @@ enum PlaybackStatus: Equatable {
     case unavailable(reason: String)
 }
 
-struct PlaybackState: Equatable {
+struct PlaybackState: Equatable, IndicatorUnavailablePresenting {
     let status: PlaybackStatus
 
     var titleText: String {
@@ -47,12 +47,23 @@ struct PlaybackState: Equatable {
         }
     }
 
-    var isAvailable: Bool {
+    var isAvailable: Bool { isDataAvailable }
+
+    var isDataAvailable: Bool {
         if case .unavailable = status {
             return false
         }
         return true
     }
+
+    var unavailableReasonText: String {
+        if case .unavailable(let reason) = status {
+            return reason
+        }
+        return ""
+    }
+
+    var unavailableSymbolName: String { "questionmark.circle" }
 
     static let stopped = PlaybackState(status: .stopped)
     static let unavailable = PlaybackState(status: .unavailable(reason: "Unavailable"))

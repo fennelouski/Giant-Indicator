@@ -7,6 +7,10 @@
 
 import XCTest
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 final class Giant_IndicatorUITests: XCTestCase {
     private let resetIndicatorPreferencesArgument = "--ui-testing-reset-indicator-preferences"
     private let batteryLevelArgument = "--ui-testing-battery-level"
@@ -19,6 +23,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         "indicator-tile-battery",
         "indicator-tile-volume",
         "indicator-tile-playback",
+        "indicator-tile-nowPlaying",
         "indicator-tile-wifi",
         "indicator-tile-speaker",
         "indicator-tile-bluetooth",
@@ -132,6 +137,36 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     @MainActor
+    func testNowPlayingTileShowsActiveMetadata() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [
+            "--ui-testing-now-playing-title", "Test Track",
+            "--ui-testing-now-playing-artist", "Test Artist",
+            "--ui-testing-now-playing-album", "Test Album"
+        ]
+        app.launch()
+
+        let tile = app.otherElements["indicator-tile-nowPlaying"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["now-playing-title-label"].label, "Test Track")
+        XCTAssertEqual(app.staticTexts["now-playing-artist-label"].label, "Test Artist")
+        XCTAssertEqual(app.staticTexts["now-playing-album-label"].label, "Test Album")
+    }
+
+    @MainActor
+    func testNowPlayingTileShowsInactiveFallback() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += ["--ui-testing-now-playing", "inactive"]
+        app.launch()
+
+        let tile = app.otherElements["indicator-tile-nowPlaying"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["now-playing-title-label"].label, "Nothing Playing")
+        XCTAssertEqual(app.staticTexts["now-playing-artist-label"].label, "No Active Media")
+        XCTAssertFalse(app.staticTexts["now-playing-album-label"].exists)
+    }
+
+    @MainActor
     func testWeatherTileShowsDeniedLocationDisclosure() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [weatherDeniedArgument]
@@ -162,17 +197,27 @@ final class Giant_IndicatorUITests: XCTestCase {
 
     @MainActor
     func testMasonryLayoutShowsAllEnabledTilesWithoutScrollingInCompactSize() throws {
+        #if canImport(UIKit)
         try assertMasonryDashboardLayout(interfaceOrientation: .portrait)
+        #else
+        try assertMasonryDashboardLayout()
+        #endif
     }
 
     @MainActor
     func testMasonryLayoutShowsAllEnabledTilesWithoutScrollingInRegularSize() throws {
+        #if canImport(UIKit)
         try assertMasonryDashboardLayout(interfaceOrientation: .landscapeLeft)
+        #else
+        try assertMasonryDashboardLayout()
+        #endif
     }
 
     @MainActor
     func testMasonryLayoutReflowsAfterOrientationAndVisibilityChanges() throws {
+        #if canImport(UIKit)
         XCUIDevice.shared.orientation = .portrait
+        #endif
 
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [
@@ -192,7 +237,9 @@ final class Giant_IndicatorUITests: XCTestCase {
         assertDashboardHasNoScrollView(app)
         assertAllEnabledTilesAreVisible(app)
 
+        #if canImport(UIKit)
         XCUIDevice.shared.orientation = .landscapeLeft
+        #endif
         assertAllEnabledTilesAreVisible(app)
 
         app.buttons["open-settings-button"].tap()
@@ -218,6 +265,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += [
             connectivityOverrideArgument,
             "--ui-testing-wifi-status", "connected",
+            "--ui-testing-wifi-signal", "72",
             "--ui-testing-speaker-status", "headphones",
             "--ui-testing-bluetooth-status", "off",
             "--ui-testing-ringer-status", "silent"
@@ -225,8 +273,8 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.otherElements["indicator-tile-wifi"].waitForExistence(timeout: 2))
-        XCTAssertEqual(app.staticTexts["wifi-value-label"].label, "Connected")
-        XCTAssertEqual(app.staticTexts["wifi-subtitle-label"].label, "Wi-Fi active")
+        XCTAssertEqual(app.staticTexts["wifi-value-label"].label, "72%")
+        XCTAssertEqual(app.staticTexts["wifi-subtitle-label"].label, "Connected")
 
         XCTAssertTrue(app.otherElements["indicator-tile-speaker"].waitForExistence(timeout: 2))
         XCTAssertEqual(app.staticTexts["speaker-value-label"].label, "Headphones")
@@ -249,16 +297,24 @@ final class Giant_IndicatorUITests: XCTestCase {
         return app
     }
 
+    #if canImport(UIKit)
     @MainActor
     private func assertMasonryDashboardLayout(interfaceOrientation: UIDeviceOrientation) throws {
         XCUIDevice.shared.orientation = interfaceOrientation
+        try assertMasonryDashboardLayout()
+    }
+    #endif
 
+    @MainActor
+    private func assertMasonryDashboardLayout() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [
             // Keep weather deterministic in UI tests.
             weatherDeniedArgument,
             batteryLevelArgument, "50",
             playbackStateArgument, "playing",
+            "--ui-testing-now-playing-title", "Test Track",
+            "--ui-testing-now-playing-artist", "Test Artist",
             "--ui-testing-volume-level", "30",
             connectivityOverrideArgument,
             "--ui-testing-wifi-status", "connected",

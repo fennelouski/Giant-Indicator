@@ -11,6 +11,7 @@ import CoreLocation
 import Combine
 @testable import Giant_Indicator
 
+@MainActor
 struct Giant_IndicatorTests {
     private final class BatteryProviderMock: BatteryStateProviding {
         let subject: CurrentValueSubject<BatteryState, Never>
@@ -110,7 +111,103 @@ struct Giant_IndicatorTests {
         #expect(!DisplayPreferences.keepScreenOn)
     }
 
-    @MainActor
+    @Test func indicatorKind_platformCapabilityVisibility() async throws {
+        #expect(IndicatorKind.battery.isVisibleInSettings)
+        #expect(IndicatorKind.volume.isVisibleInSettings)
+
+        #if canImport(UIKit)
+        #expect(IndicatorKind.ringer.isVisibleInSettings)
+        #expect(
+            IndicatorKind.ringer.platformCapabilityHandling ==
+                .showUnavailableState(reason: "iOS does not expose ringer switch state")
+        )
+        #else
+        #expect(!IndicatorKind.ringer.isVisibleInSettings)
+        #expect(IndicatorKind.ringer.platformCapabilityHandling == .hidden)
+        #endif
+    }
+
+    @Test func indicatorFallbackPresentation_unknownValueText() async throws {
+        #expect(IndicatorFallbackPresentation.unknownValueText == "--")
+    }
+
+    @Test func batteryState_exposesUnavailableFallbackVisual() async throws {
+        let unavailable = BatteryState.unavailable
+        #expect(!unavailable.isDataAvailable)
+        #expect(unavailable.unavailableSymbolName == "batteryblock.slash")
+        #expect(unavailable.unavailableReasonText == "Unavailable")
+    }
+
+    @Test func volumeState_exposesUnavailableFallbackVisual() async throws {
+        let unavailable = VolumeState.unavailable
+        #expect(!unavailable.isDataAvailable)
+        #expect(unavailable.unavailableSymbolName == "speaker.slash.fill")
+    }
+
+    @Test func playbackState_exposesUnavailableFallbackVisual() async throws {
+        let unavailable = PlaybackState.unavailable
+        #expect(!unavailable.isDataAvailable)
+        #expect(unavailable.unavailableSymbolName == "questionmark.circle")
+        #expect(unavailable.titleText == "--")
+        #expect(unavailable.unavailableReasonText == "Unavailable")
+    }
+
+    @Test func nowPlayingState_activeMetadata() async throws {
+        let active = NowPlayingState(
+            availability: .active(
+                NowPlayingMetadata(title: "Track", artist: "Artist", album: "Album")
+            )
+        )
+        #expect(active.isDataAvailable)
+        #expect(active.titleText == "Track")
+        #expect(active.artistText == "Artist")
+        #expect(active.albumText == "Album")
+    }
+
+    @Test func nowPlayingState_inactiveFallback() async throws {
+        let inactive = NowPlayingState.inactive
+        #expect(inactive.isDataAvailable)
+        #expect(inactive.titleText == "Nothing Playing")
+        #expect(inactive.artistText == "No Active Media")
+        #expect(inactive.albumText == nil)
+    }
+
+    @Test func nowPlayingState_exposesUnavailableFallbackVisual() async throws {
+        let unavailable = NowPlayingState.unavailable
+        #expect(!unavailable.isDataAvailable)
+        #expect(unavailable.titleText == "--")
+        #expect(unavailable.unavailableReasonText == "Unavailable")
+    }
+
+    @Test func connectivityIndicatorState_normalizesUnavailableValueText() async throws {
+        let unavailable = ConnectivityIndicatorState.unavailable(
+            title: "Wi-Fi",
+            subtitle: "Wi-Fi status unavailable",
+            symbolName: "wifi.slash",
+            reason: "Permission Denied"
+        )
+
+        #expect(!unavailable.isDataAvailable)
+        #expect(unavailable.displayValueText == "--")
+        #expect(unavailable.unavailableReasonText == "Permission Denied")
+    }
+
+    @Test func indicatorPlaceholder_fromConnectivityIndicator_marksUnavailableFallback() async throws {
+        let placeholder = IndicatorPlaceholder.fromConnectivityIndicator(
+            .unavailable(
+                title: "Bluetooth",
+                subtitle: "Bluetooth permission denied",
+                symbolName: "bolt.horizontal",
+                reason: "Permission Denied"
+            ),
+            kind: .bluetooth
+        )
+
+        #expect(placeholder.showsUnavailableFallback)
+        #expect(placeholder.value == "--")
+        #expect(placeholder.subtitle == "Bluetooth permission denied")
+    }
+
     @Test func batteryViewModel_onlyPublishesWhenStateChanges() async throws {
         let initial = BatteryState.unavailable
         let changed = BatteryState(percentage: 55, availability: .available)

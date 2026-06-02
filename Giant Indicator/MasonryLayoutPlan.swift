@@ -226,6 +226,8 @@ struct MasonryLayoutPlan {
             return 250
         case .playback:
             return 250
+        case .nowPlaying:
+            return 280
         case .wifi, .speaker, .bluetooth, .ringer:
             return 220
         }

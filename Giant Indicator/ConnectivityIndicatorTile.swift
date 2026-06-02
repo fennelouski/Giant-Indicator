@@ -13,12 +13,16 @@ struct ConnectivityIndicatorTile: View {
 
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
-            Image(systemName: placeholder.symbol)
-                .font(.system(size: metrics.symbolFontSize, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(height: metrics.iconHeight)
-                .padding(.horizontal, 8)
-                .accessibilityHidden(true)
+            if placeholder.showsUnavailableFallback {
+                IndicatorUnavailableGlyph(symbolName: placeholder.symbol, metrics: metrics)
+            } else {
+                Image(systemName: placeholder.symbol)
+                    .font(.system(size: metrics.symbolFontSize, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(height: metrics.iconHeight)
+                    .padding(.horizontal, 8)
+                    .accessibilityHidden(true)
+            }
 
             Text(placeholder.value)
                 .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))

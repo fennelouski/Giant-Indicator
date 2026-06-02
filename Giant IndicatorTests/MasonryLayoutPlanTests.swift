@@ -9,6 +9,7 @@ import CoreGraphics
 import Testing
 @testable import Giant_Indicator
 
+@MainActor
 struct MasonryLayoutPlanTests {
 
     private static let allIndicatorPlaceholders: [IndicatorPlaceholder] = [
@@ -16,6 +17,7 @@ struct MasonryLayoutPlanTests {
         IndicatorPlaceholder(kind: .battery, value: "50%"),
         IndicatorPlaceholder(kind: .volume, value: "30%"),
         IndicatorPlaceholder(kind: .playback, value: "Playing"),
+        IndicatorPlaceholder(kind: .nowPlaying, value: "Track"),
         IndicatorPlaceholder(kind: .wifi, value: "Connected", subtitle: "Wi-Fi active"),
         IndicatorPlaceholder(kind: .speaker, value: "Speaker", subtitle: "Built-in"),
         IndicatorPlaceholder(kind: .bluetooth, value: "Off", subtitle: "Bluetooth disabled"),

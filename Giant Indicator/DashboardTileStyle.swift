@@ -8,7 +8,7 @@
 import SwiftUI
 
 private struct DashboardTileContainerModifier: ViewModifier {
-    @Environment(\.accessibilityContrast) private var accessibilityContrast
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
@@ -24,15 +24,15 @@ private struct DashboardTileContainerModifier: ViewModifier {
     }
 
     private var tileFillOpacity: Double {
-        accessibilityContrast == .high ? 0.2 : 0.14
+        colorSchemeContrast == .increased ? 0.2 : 0.14
     }
 
     private var tileStrokeOpacity: Double {
-        accessibilityContrast == .high ? 0.58 : 0.4
+        colorSchemeContrast == .increased ? 0.58 : 0.4
     }
 
     private var tileStrokeWidth: CGFloat {
-        accessibilityContrast == .high ? 2 : 1.5
+        colorSchemeContrast == .increased ? 2 : 1.5
     }
 }
 

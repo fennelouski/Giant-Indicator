@@ -13,11 +13,18 @@ struct VolumeIndicatorTile: View {
 
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
-            VolumeIcon(level: volumeState.normalizedLevel, symbolName: volumeState.symbolName)
-                .frame(height: metrics.iconHeight)
-                .padding(.horizontal, 8)
+            if volumeState.isDataAvailable {
+                VolumeIcon(level: volumeState.normalizedLevel, symbolName: volumeState.symbolName)
+                    .frame(height: metrics.iconHeight)
+                    .padding(.horizontal, 8)
+            } else {
+                IndicatorUnavailableGlyph(
+                    symbolName: volumeState.unavailableSymbolName,
+                    metrics: metrics
+                )
+            }
 
-            if volumeState.isAvailable {
+            if volumeState.isDataAvailable {
                 Text(volumeState.percentageText)
                     .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
@@ -25,17 +32,12 @@ struct VolumeIndicatorTile: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("volume-percentage-label")
             } else {
-                Text("--")
-                    .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .accessibilityIdentifier("volume-percentage-label")
-
-                Text(volumeState.unavailableReason)
-                    .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .accessibilityIdentifier("volume-unavailable-label")
+                IndicatorUnavailableValueCluster(
+                    reason: volumeState.unavailableReasonText,
+                    metrics: metrics,
+                    valueAccessibilityIdentifier: "volume-percentage-label",
+                    reasonAccessibilityIdentifier: "volume-unavailable-label"
+                )
             }
 
             Text("Volume")

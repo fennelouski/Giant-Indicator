@@ -8,6 +8,7 @@ struct ContentView: View {
     @StateObject private var batteryViewModel = BatteryViewModel()
     @StateObject private var volumeViewModel = VolumeViewModel()
     @StateObject private var playbackViewModel = PlaybackViewModel()
+    @StateObject private var nowPlayingViewModel = NowPlayingViewModel()
     @StateObject private var connectivityViewModel = ConnectivityViewModel()
 
     private var indicators: [IndicatorPlaceholder] {
@@ -15,36 +16,36 @@ struct ContentView: View {
             IndicatorPlaceholder(kind: .battery, value: batteryViewModel.state.percentageText),
             IndicatorPlaceholder(kind: .volume, value: volumeViewModel.state.percentageText),
             IndicatorPlaceholder(kind: .playback, value: playbackViewModel.state.titleText),
-            IndicatorPlaceholder(
-                kind: .wifi,
-                value: connectivityViewModel.state.wifi.valueText,
-                subtitle: connectivityViewModel.state.wifi.subtitleText,
-                symbolOverride: connectivityViewModel.state.wifi.symbolName
+            IndicatorPlaceholder(kind: .nowPlaying, value: nowPlayingViewModel.state.titleText),
+            IndicatorPlaceholder.fromConnectivityIndicator(
+                connectivityViewModel.state.wifi,
+                kind: .wifi
             ),
-            IndicatorPlaceholder(
-                kind: .speaker,
-                value: connectivityViewModel.state.speaker.valueText,
-                subtitle: connectivityViewModel.state.speaker.subtitleText,
-                symbolOverride: connectivityViewModel.state.speaker.symbolName
+            IndicatorPlaceholder.fromConnectivityIndicator(
+                connectivityViewModel.state.speaker,
+                kind: .speaker
             ),
-            IndicatorPlaceholder(
-                kind: .bluetooth,
-                value: connectivityViewModel.state.bluetooth.valueText,
-                subtitle: connectivityViewModel.state.bluetooth.subtitleText,
-                symbolOverride: connectivityViewModel.state.bluetooth.symbolName
+            IndicatorPlaceholder.fromConnectivityIndicator(
+                connectivityViewModel.state.bluetooth,
+                kind: .bluetooth
             ),
-            IndicatorPlaceholder(
-                kind: .ringer,
-                value: connectivityViewModel.state.ringer.valueText,
-                subtitle: connectivityViewModel.state.ringer.subtitleText,
-                symbolOverride: connectivityViewModel.state.ringer.symbolName
+            IndicatorPlaceholder.fromConnectivityIndicator(
+                connectivityViewModel.state.ringer,
+                kind: .ringer
             ),
             IndicatorPlaceholder.fromWeatherState(weatherViewModel.displayState)
         ]
     }
 
     private var visibleIndicators: [IndicatorPlaceholder] {
-        indicators.filter { isIndicatorVisible($0.kind) }
+        indicators.filter { placeholder in
+            isIndicatorVisible(placeholder.kind) &&
+                placeholder.kind.platformCapabilityHandling != .hidden
+        }
+    }
+
+    private var settingsIndicatorKinds: [IndicatorKind] {
+        IndicatorKind.allCases.filter(\.isVisibleInSettings)
     }
 
     var body: some View {
@@ -114,7 +115,7 @@ struct ContentView: View {
             SettingsView(
                 indicatorVisibility: $indicatorVisibility,
                 keepScreenOn: $keepScreenOn,
-                indicatorKinds: IndicatorKind.allCases
+                indicatorKinds: settingsIndicatorKinds
             )
         }
     }
@@ -131,6 +132,8 @@ struct ContentView: View {
             VolumeIndicatorTile(volumeState: volumeViewModel.state, metrics: metrics)
         } else if placeholder.kind == .playback {
             PlaybackIndicatorTile(playbackState: playbackViewModel.state, metrics: metrics)
+        } else if placeholder.kind == .nowPlaying {
+            NowPlayingIndicatorTile(nowPlayingState: nowPlayingViewModel.state, metrics: metrics)
         } else if
             placeholder.kind == .wifi ||
             placeholder.kind == .speaker ||

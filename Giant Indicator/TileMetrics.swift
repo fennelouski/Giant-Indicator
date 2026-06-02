@@ -35,6 +35,16 @@ struct TileMetrics {
         clamp(height * 0.24, min: 34, max: 66)
     }
 
+    /// Primary battery percentage typography (PR-17: percentage-first at a distance).
+    var batteryPercentageFontSize: CGFloat {
+        clamp(height * 0.34, min: 48, max: 92)
+    }
+
+    /// Secondary fill icon under the percentage (PR-17).
+    var batteryIconHeight: CGFloat {
+        clamp(height * 0.2, min: 32, max: 64)
+    }
+
     var titleFontSize: CGFloat {
         clamp(height * 0.1, min: 18, max: 28)
     }

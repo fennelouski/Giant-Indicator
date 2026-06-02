@@ -5,12 +5,34 @@ enum ConnectivityAvailability: Equatable {
     case unavailable(reason: String)
 }
 
-struct ConnectivityIndicatorState: Equatable {
+struct ConnectivityIndicatorState: Equatable, IndicatorUnavailablePresenting {
     let title: String
     let valueText: String
     let subtitleText: String
     let symbolName: String
     let availability: ConnectivityAvailability
+
+    var isDataAvailable: Bool {
+        if case .available = availability {
+            return true
+        }
+        return false
+    }
+
+    var isAvailable: Bool { isDataAvailable }
+
+    var unavailableReasonText: String {
+        if case .unavailable(let reason) = availability {
+            return reason
+        }
+        return ""
+    }
+
+    var unavailableSymbolName: String { symbolName }
+
+    var displayValueText: String {
+        isDataAvailable ? valueText : IndicatorFallbackPresentation.unknownValueText
+    }
 
     static func unavailable(
         title: String,

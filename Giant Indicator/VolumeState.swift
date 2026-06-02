@@ -5,7 +5,7 @@ enum VolumeAvailability: Equatable {
     case unavailable(reason: String)
 }
 
-struct VolumeState: Equatable {
+struct VolumeState: Equatable, IndicatorUnavailablePresenting {
     let percentage: Int
     let availability: VolumeAvailability
 
@@ -17,19 +17,25 @@ struct VolumeState: Equatable {
         "\(percentage.clamped(to: 0...100))%"
     }
 
-    var isAvailable: Bool {
+    var isAvailable: Bool { isDataAvailable }
+
+    var isDataAvailable: Bool {
         if case .available = availability {
             return true
         }
         return false
     }
 
-    var unavailableReason: String {
+    var unavailableReason: String { unavailableReasonText }
+
+    var unavailableReasonText: String {
         if case .unavailable(let reason) = availability {
             return reason
         }
         return ""
     }
+
+    var unavailableSymbolName: String { "speaker.slash.fill" }
 
     var symbolName: String {
         let clamped = percentage.clamped(to: 0...100)
