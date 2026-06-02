@@ -27,7 +27,7 @@ struct WeatherAttributionView: View {
                         .foregroundStyle(.white.opacity(0.8))
                 }
                 if let legalPageURL = attribution.legalPageURL {
-                    Link("Weather data attribution", destination: legalPageURL)
+                    Link("Data sources and legal details", destination: legalPageURL)
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.8))
                 }
@@ -39,7 +39,7 @@ struct WeatherAttributionView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
             } else if attribution.legalPageURL == nil {
-                Text("Weather data by Apple Weather and data providers.")
+                Text("Weather information is provided by Apple Weather and its data providers.")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
