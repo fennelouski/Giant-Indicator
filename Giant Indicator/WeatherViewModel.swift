@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 final class WeatherViewModel: ObservableObject {
@@ -8,7 +9,10 @@ final class WeatherViewModel: ObservableObject {
     private let locationProvider: WeatherLocationProvider
 
     init(
-        repository: WeatherRepository = WeatherRepository(),
+        repository: WeatherRepository = WeatherRepository(
+            service: LiveWeatherServiceClient(),
+            cacheStore: WeatherCacheStore()
+        ),
         locationProvider: WeatherLocationProvider = WeatherLocationProvider()
     ) {
         self.repository = repository

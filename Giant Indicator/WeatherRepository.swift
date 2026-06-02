@@ -23,8 +23,8 @@ actor WeatherRepository {
     private let now: () -> Date
 
     init(
-        service: WeatherServiceClient = LiveWeatherServiceClient(),
-        cacheStore: WeatherCacheStore = WeatherCacheStore(),
+        service: WeatherServiceClient,
+        cacheStore: WeatherCacheStore,
         now: @escaping () -> Date = Date.init
     ) {
         self.service = service

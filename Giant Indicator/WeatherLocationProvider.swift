@@ -1,7 +1,6 @@
 import CoreLocation
 import Foundation
 
-@MainActor
 final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation, Never>?
