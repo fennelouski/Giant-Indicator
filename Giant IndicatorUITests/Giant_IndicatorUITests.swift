@@ -13,6 +13,7 @@ final class Giant_IndicatorUITests: XCTestCase {
     private let playbackStateArgument = "--ui-testing-playback-state"
     private let weatherDeniedArgument = "--ui-testing-weather-denied"
     private let weatherAttributionArgument = "--ui-testing-weather-attribution"
+    private let connectivityOverrideArgument = "--ui-testing-connectivity-override"
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -131,11 +132,11 @@ final class Giant_IndicatorUITests: XCTestCase {
 
         let weatherValue = app.staticTexts["weather-value-label"]
         XCTAssertTrue(weatherValue.waitForExistence(timeout: 2))
-        XCTAssertEqual(weatherValue.label, "Location access denied. Enable Location Services for local weather.")
+        XCTAssertEqual(weatherValue.label, "Location access is off. Turn on Location Services in Settings to see local weather.")
 
         let weatherSubtitle = app.staticTexts["weather-subtitle-label"]
         XCTAssertTrue(weatherSubtitle.waitForExistence(timeout: 2))
-        XCTAssertEqual(weatherSubtitle.label, "Location permission denied")
+        XCTAssertEqual(weatherSubtitle.label, "Location access is off")
     }
 
     @MainActor
@@ -147,6 +148,35 @@ final class Giant_IndicatorUITests: XCTestCase {
         let weatherTile = app.otherElements["indicator-tile-weather"]
         XCTAssertTrue(weatherTile.waitForExistence(timeout: 2))
         XCTAssertTrue(app.otherElements["weather-attribution-view"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testConnectivityTilesShowConfiguredState() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [
+            connectivityOverrideArgument,
+            "--ui-testing-wifi-status", "connected",
+            "--ui-testing-speaker-status", "headphones",
+            "--ui-testing-bluetooth-status", "off",
+            "--ui-testing-ringer-status", "silent"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.otherElements["indicator-tile-wifi"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["wifi-value-label"].label, "Connected")
+        XCTAssertEqual(app.staticTexts["wifi-subtitle-label"].label, "Wi-Fi active")
+
+        XCTAssertTrue(app.otherElements["indicator-tile-speaker"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["speaker-value-label"].label, "Headphones")
+        XCTAssertEqual(app.staticTexts["speaker-subtitle-label"].label, "Wired output")
+
+        XCTAssertTrue(app.otherElements["indicator-tile-bluetooth"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["bluetooth-value-label"].label, "Off")
+        XCTAssertEqual(app.staticTexts["bluetooth-subtitle-label"].label, "Bluetooth disabled")
+
+        XCTAssertTrue(app.otherElements["indicator-tile-ringer"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.staticTexts["ringer-value-label"].label, "Silent")
+        XCTAssertEqual(app.staticTexts["ringer-subtitle-label"].label, "Muted alerts")
     }
 
     private func configuredApp(resetIndicatorPreferences: Bool) -> XCUIApplication {

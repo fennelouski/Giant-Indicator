@@ -37,7 +37,7 @@ struct ConnectivityState: Equatable {
     static let unavailable = ConnectivityState(
         wifi: .unavailable(title: "Wi-Fi", subtitle: "Status unavailable", symbolName: "wifi.slash"),
         speaker: .unavailable(title: "Speaker/Output", subtitle: "Output unavailable", symbolName: "hifispeaker.slash"),
-        bluetooth: .unavailable(title: "Bluetooth", subtitle: "Status unavailable", symbolName: "bolt.horizontal.circle"),
+        bluetooth: .unavailable(title: "Bluetooth", subtitle: "Status unavailable", symbolName: "bolt.horizontal"),
         ringer: .unavailable(title: "Ringer/Silent", subtitle: "Status unavailable", symbolName: "bell.slash")
     )
 }

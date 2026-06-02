@@ -26,8 +26,8 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
 
     private var wifiConnected = false
     private var bluetoothValue = "Off"
-    private var bluetoothSubtitle = "Bluetooth disabled"
-    private var bluetoothSymbol = "dot.radiowaves.left.and.right.slash"
+    private var bluetoothSubtitle = "Bluetooth is turned off"
+    private var bluetoothSymbol = "bolt.horizontal.slash"
     private var bluetoothAvailability: ConnectivityAvailability = .available
     private var cancellables = Set<AnyCancellable>()
 
@@ -59,8 +59,8 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         bluetoothManager = CBCentralManager(delegate: self, queue: monitorQueue)
         #else
         bluetoothValue = "--"
-        bluetoothSubtitle = "Unsupported on this platform"
-        bluetoothSymbol = "bolt.horizontal.circle"
+        bluetoothSubtitle = "Bluetooth controls are unavailable on this platform"
+        bluetoothSymbol = "bolt.horizontal"
         bluetoothAvailability = .unavailable(reason: "Unsupported")
         #endif
 
@@ -151,12 +151,21 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     }
 
     private func makeRingerState() -> ConnectivityIndicatorState {
+        #if canImport(UIKit)
         ConnectivityIndicatorState.unavailable(
             title: "Ringer/Silent",
-            subtitle: "Status not exposed by API",
+            subtitle: "iOS does not expose ringer switch state",
             symbolName: "bell.slash",
             reason: "Platform Limited"
         )
+        #else
+        ConnectivityIndicatorState.unavailable(
+            title: "Ringer/Silent",
+            subtitle: "Ringer mode is not available on this platform",
+            symbolName: "bell.slash",
+            reason: "Unsupported"
+        )
+        #endif
     }
 
     #if canImport(AVFoundation) && canImport(UIKit)
@@ -276,22 +285,22 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
                 title: "Bluetooth",
                 valueText: "On",
                 subtitleText: "Bluetooth enabled",
-                symbolName: "dot.radiowaves.left.and.right",
+                symbolName: "bolt.horizontal",
                 availability: .available
             )
         case "off":
             return ConnectivityIndicatorState(
                 title: "Bluetooth",
                 valueText: "Off",
-                subtitleText: "Bluetooth disabled",
-                symbolName: "dot.radiowaves.left.and.right.slash",
+                subtitleText: "Bluetooth is turned off",
+                symbolName: "bolt.horizontal.slash",
                 availability: .available
             )
         default:
             return .unavailable(
                 title: "Bluetooth",
                 subtitle: "Bluetooth status unavailable",
-                symbolName: "bolt.horizontal.circle",
+                symbolName: "bolt.horizontal",
                 reason: "Unavailable"
             )
         }
@@ -333,27 +342,27 @@ extension SystemConnectivityProvider: CBCentralManagerDelegate {
         case .poweredOn:
             bluetoothValue = "On"
             bluetoothSubtitle = "Bluetooth enabled"
-            bluetoothSymbol = "dot.radiowaves.left.and.right"
+            bluetoothSymbol = "bolt.horizontal"
             bluetoothAvailability = .available
         case .poweredOff:
             bluetoothValue = "Off"
-            bluetoothSubtitle = "Bluetooth disabled"
-            bluetoothSymbol = "dot.radiowaves.left.and.right.slash"
+            bluetoothSubtitle = "Bluetooth is turned off"
+            bluetoothSymbol = "bolt.horizontal.slash"
             bluetoothAvailability = .available
         case .unauthorized:
             bluetoothValue = "--"
             bluetoothSubtitle = "Bluetooth permission denied"
-            bluetoothSymbol = "bolt.horizontal.circle"
+            bluetoothSymbol = "bolt.horizontal"
             bluetoothAvailability = .unavailable(reason: "Permission Denied")
         case .unsupported:
             bluetoothValue = "--"
             bluetoothSubtitle = "Bluetooth unsupported"
-            bluetoothSymbol = "bolt.horizontal.circle"
+            bluetoothSymbol = "bolt.horizontal"
             bluetoothAvailability = .unavailable(reason: "Unsupported")
         default:
             bluetoothValue = "--"
             bluetoothSubtitle = "Bluetooth unavailable"
-            bluetoothSymbol = "bolt.horizontal.circle"
+            bluetoothSymbol = "bolt.horizontal"
             bluetoothAvailability = .unavailable(reason: "Unavailable")
         }
         publishSnapshot()

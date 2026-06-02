@@ -7,16 +7,37 @@ struct ContentView: View {
     @StateObject private var batteryViewModel = BatteryViewModel()
     @StateObject private var volumeViewModel = VolumeViewModel()
     @StateObject private var playbackViewModel = PlaybackViewModel()
+    @StateObject private var connectivityViewModel = ConnectivityViewModel()
 
     private var indicators: [IndicatorPlaceholder] {
         [
             .init(kind: .battery, value: batteryViewModel.state.percentageText),
             .init(kind: .volume, value: volumeViewModel.state.percentageText),
             .init(kind: .playback, value: playbackViewModel.state.titleText),
-            .init(kind: .wifi, value: "Connected"),
-            .init(kind: .speaker, value: "Speaker"),
-            .init(kind: .bluetooth, value: "On"),
-            .init(kind: .ringer, value: "Ring"),
+            .init(
+                kind: .wifi,
+                value: connectivityViewModel.state.wifi.valueText,
+                subtitle: connectivityViewModel.state.wifi.subtitleText,
+                symbolOverride: connectivityViewModel.state.wifi.symbolName
+            ),
+            .init(
+                kind: .speaker,
+                value: connectivityViewModel.state.speaker.valueText,
+                subtitle: connectivityViewModel.state.speaker.subtitleText,
+                symbolOverride: connectivityViewModel.state.speaker.symbolName
+            ),
+            .init(
+                kind: .bluetooth,
+                value: connectivityViewModel.state.bluetooth.valueText,
+                subtitle: connectivityViewModel.state.bluetooth.subtitleText,
+                symbolOverride: connectivityViewModel.state.bluetooth.symbolName
+            ),
+            .init(
+                kind: .ringer,
+                value: connectivityViewModel.state.ringer.valueText,
+                subtitle: connectivityViewModel.state.ringer.subtitleText,
+                symbolOverride: connectivityViewModel.state.ringer.symbolName
+            ),
             .fromWeatherState(weatherViewModel.displayState)
         ]
     }
@@ -46,6 +67,13 @@ struct ContentView: View {
                                 VolumeIndicatorTile(volumeState: volumeViewModel.state)
                             } else if placeholder.kind == .playback {
                                 PlaybackIndicatorTile(playbackState: playbackViewModel.state)
+                            } else if
+                                placeholder.kind == .wifi ||
+                                placeholder.kind == .speaker ||
+                                placeholder.kind == .bluetooth ||
+                                placeholder.kind == .ringer
+                            {
+                                ConnectivityIndicatorTile(placeholder: placeholder)
                             } else {
                                 IndicatorTile(placeholder: placeholder)
                             }
@@ -207,10 +235,11 @@ private struct IndicatorPlaceholder: Identifiable {
     let value: String
     var subtitle: String?
     var attribution: WeatherAttributionData?
+    var symbolOverride: String? = nil
 
     var id: IndicatorKind { kind }
     var title: String { kind.displayName }
-    var symbol: String { kind.symbol }
+    var symbol: String { symbolOverride ?? kind.symbol }
 
     static func fromWeatherState(_ state: WeatherDisplayState) -> IndicatorPlaceholder {
         guard let snapshot = state.snapshot else {
@@ -347,6 +376,54 @@ private struct IndicatorTile: View {
 
             if let attribution = placeholder.attribution {
                 WeatherAttributionView(attribution: attribution)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .padding(24)
+        .accessibilityIdentifier("indicator-tile-\(placeholder.kind.rawValue)")
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct ConnectivityIndicatorTile: View {
+    let placeholder: IndicatorPlaceholder
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: placeholder.symbol)
+                .font(.system(size: 68, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(height: 82)
+                .padding(.horizontal, 8)
+                .accessibilityHidden(true)
+
+            Text(placeholder.value)
+                .font(.system(size: 46, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .accessibilityIdentifier("\(placeholder.kind.rawValue)-value-label")
+
+            Text(placeholder.title)
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+
+            if let subtitle = placeholder.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("\(placeholder.kind.rawValue)-subtitle-label")
             }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
