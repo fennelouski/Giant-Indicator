@@ -171,6 +171,48 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     @MainActor
+    func testMasonryLayoutReflowsAfterOrientationAndVisibilityChanges() throws {
+        XCUIDevice.shared.orientation = .portrait
+
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [
+            weatherDeniedArgument,
+            batteryLevelArgument, "81",
+            playbackStateArgument, "playing",
+            "--ui-testing-volume-level", "35",
+            connectivityOverrideArgument,
+            "--ui-testing-wifi-status", "connected",
+            "--ui-testing-speaker-status", "speaker",
+            "--ui-testing-bluetooth-status", "off",
+            "--ui-testing-ringer-status", "silent"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
+        assertDashboardHasNoScrollView(app)
+        assertAllEnabledTilesAreVisible(app)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        assertAllEnabledTilesAreVisible(app)
+
+        app.buttons["open-settings-button"].tap()
+        let batteryToggle = app.switches["indicator-toggle-battery"]
+        XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
+        batteryToggle.tap()
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.otherElements["indicator-tile-battery"].exists)
+        assertDashboardHasNoScrollView(app)
+
+        app.buttons["open-settings-button"].tap()
+        XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
+        batteryToggle.tap()
+        app.buttons["Done"].tap()
+
+        assertDashboardHasNoScrollView(app)
+        assertAllEnabledTilesAreVisible(app)
+    }
+
+    @MainActor
     func testConnectivityTilesShowConfiguredState() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [
@@ -230,22 +272,11 @@ final class Giant_IndicatorUITests: XCTestCase {
         XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
 
         XCTAssertEqual(
-            app.scrollViews.count,
-            0,
+            app.scrollViews.count, 0,
             "Dashboard masonry layout must not rely on scrolling (PR-9)."
         )
 
-        for tileIdentifier in enabledIndicatorTileIdentifiers {
-            let tile = app.otherElements[tileIdentifier]
-            XCTAssertTrue(
-                tile.waitForExistence(timeout: 3),
-                "Expected enabled tile \(tileIdentifier) to exist."
-            )
-            XCTAssertTrue(
-                tile.isHittable,
-                "Expected enabled tile \(tileIdentifier) to be on-screen and hittable."
-            )
-        }
+        assertAllEnabledTilesAreVisible(app)
     }
 
     private func assertPlaybackState(
@@ -268,6 +299,28 @@ final class Giant_IndicatorUITests: XCTestCase {
             let subtitleLabel = app.staticTexts["playback-subtitle-label"]
             XCTAssertTrue(subtitleLabel.waitForExistence(timeout: 2))
             XCTAssertEqual(subtitleLabel.label, expectedSubtitle)
+        }
+    }
+
+    private func assertDashboardHasNoScrollView(_ app: XCUIApplication) {
+        XCTAssertEqual(
+            app.scrollViews.count,
+            0,
+            "Dashboard masonry layout must not rely on scrolling (PR-9/PR-10)."
+        )
+    }
+
+    private func assertAllEnabledTilesAreVisible(_ app: XCUIApplication) {
+        for tileIdentifier in enabledIndicatorTileIdentifiers {
+            let tile = app.otherElements[tileIdentifier]
+            XCTAssertTrue(
+                tile.waitForExistence(timeout: 3),
+                "Expected enabled tile \(tileIdentifier) to exist."
+            )
+            XCTAssertTrue(
+                tile.isHittable,
+                "Expected enabled tile \(tileIdentifier) to be on-screen and hittable."
+            )
         }
     }
 }

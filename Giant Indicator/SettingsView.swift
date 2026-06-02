@@ -10,11 +10,19 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var indicatorVisibility: [IndicatorKind: Bool]
+    @Binding var keepScreenOn: Bool
     let indicatorKinds: [IndicatorKind]
 
     var body: some View {
         NavigationStack {
             List {
+                Section("Display") {
+                    Toggle(isOn: $keepScreenOn) {
+                        Label("Keep Screen On", systemImage: "sun.max.fill")
+                    }
+                    .accessibilityIdentifier("display-toggle-keep-screen-on")
+                }
+
                 Section("Visible Indicators") {
                     ForEach(indicatorKinds) { kind in
                         Toggle(isOn: binding(for: kind)) {

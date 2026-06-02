@@ -14,6 +14,7 @@ struct Giant_IndicatorApp: App {
     init() {
         if ProcessInfo.processInfo.arguments.contains("--ui-testing-reset-indicator-preferences") {
             IndicatorPreferences.resetVisibility()
+            DisplayPreferences.reset()
         }
     }
 
@@ -24,6 +25,13 @@ struct Giant_IndicatorApp: App {
                 .task {
                     await weatherViewModel.refreshOnLaunch()
                 }
+                #if os(macOS)
+                .frame(minWidth: 520, minHeight: 400)
+                #endif
         }
+        #if os(macOS)
+        .defaultSize(width: 900, height: 600)
+        .windowResizability(.contentMinSize)
+        #endif
     }
 }

@@ -91,6 +91,25 @@ struct Giant_IndicatorTests {
         #expect(provider.userVisibleErrorMessage(.authorized(CLLocation(latitude: 0, longitude: 0))) == nil)
     }
 
+    @Test func displayPreferences_keepScreenOnDefaultsAndPersists() async throws {
+        let key = "display.keepScreenOn"
+        let defaults = UserDefaults.standard
+        let prior = defaults.object(forKey: key)
+        defer {
+            if let prior {
+                defaults.set(prior, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+
+        defaults.removeObject(forKey: key)
+        #expect(DisplayPreferences.keepScreenOn)
+
+        DisplayPreferences.keepScreenOn = false
+        #expect(!DisplayPreferences.keepScreenOn)
+    }
+
     @MainActor
     @Test func batteryViewModel_onlyPublishesWhenStateChanges() async throws {
         let initial = BatteryState.unavailable
