@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject private var weatherViewModel: WeatherViewModel
     @State private var isSettingsPresented = false
     @State private var indicatorVisibility: [IndicatorKind: Bool] = IndicatorPreferences.loadVisibility()
+    @State private var keepScreenOn = DisplayPreferences.keepScreenOn
     @StateObject private var batteryViewModel = BatteryViewModel()
     @StateObject private var volumeViewModel = VolumeViewModel()
     @StateObject private var playbackViewModel = PlaybackViewModel()
@@ -66,7 +67,8 @@ struct ContentView: View {
                         ForEach(Array(layout.columns.enumerated()), id: \.offset) { _, column in
                             VStack(spacing: layout.spacing) {
                                 ForEach(column.items) { item in
-                                    tileView(for: item.placeholder)
+                                    let metrics = TileMetrics(width: item.width, height: item.height)
+                                    tileView(for: item.placeholder, metrics: metrics)
                                         .frame(height: item.height)
                                 }
                             }
@@ -75,8 +77,14 @@ struct ContentView: View {
                     }
                     .padding(layout.outerPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .animation(.easeInOut(duration: 0.2), value: layout.layoutSignature)
                 }
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear
+                .frame(height: 56)
+                .allowsHitTesting(false)
         }
         .overlay(alignment: .topTrailing) {
             Button {
@@ -98,9 +106,14 @@ struct ContentView: View {
             .accessibilityLabel("Open Settings")
             .accessibilityIdentifier("open-settings-button")
         }
+        .keepScreenAwake(keepScreenOn)
+        .onChange(of: keepScreenOn) { _, newValue in
+            DisplayPreferences.keepScreenOn = newValue
+        }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(
                 indicatorVisibility: $indicatorVisibility,
+                keepScreenOn: $keepScreenOn,
                 indicatorKinds: IndicatorKind.allCases
             )
         }
@@ -111,22 +124,22 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func tileView(for placeholder: IndicatorPlaceholder) -> some View {
+    private func tileView(for placeholder: IndicatorPlaceholder, metrics: TileMetrics) -> some View {
         if placeholder.kind == .battery {
-            BatteryIndicatorTile(batteryState: batteryViewModel.state)
+            BatteryIndicatorTile(batteryState: batteryViewModel.state, metrics: metrics)
         } else if placeholder.kind == .volume {
-            VolumeIndicatorTile(volumeState: volumeViewModel.state)
+            VolumeIndicatorTile(volumeState: volumeViewModel.state, metrics: metrics)
         } else if placeholder.kind == .playback {
-            PlaybackIndicatorTile(playbackState: playbackViewModel.state)
+            PlaybackIndicatorTile(playbackState: playbackViewModel.state, metrics: metrics)
         } else if
             placeholder.kind == .wifi ||
             placeholder.kind == .speaker ||
             placeholder.kind == .bluetooth ||
             placeholder.kind == .ringer
         {
-            ConnectivityIndicatorTile(placeholder: placeholder)
+            ConnectivityIndicatorTile(placeholder: placeholder, metrics: metrics)
         } else {
-            IndicatorTile(placeholder: placeholder)
+            IndicatorTile(placeholder: placeholder, metrics: metrics)
         }
     }
 }

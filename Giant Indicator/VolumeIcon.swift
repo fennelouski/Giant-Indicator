@@ -26,7 +26,7 @@ struct VolumeIcon: View {
 
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
-                        .fill(Color.white.opacity(0.18))
+                        .fill(Color.white.opacity(0.34))
 
                     RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
                         .fill(Color.white)

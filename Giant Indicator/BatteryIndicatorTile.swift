@@ -9,49 +9,44 @@ import SwiftUI
 
 struct BatteryIndicatorTile: View {
     let batteryState: BatteryState
+    let metrics: TileMetrics
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: metrics.contentSpacing) {
             BatteryIcon(level: batteryState.normalizedLevel)
-                .frame(height: 82)
+                .frame(height: metrics.iconHeight)
                 .padding(.horizontal, 8)
 
             if batteryState.isAvailable {
                 Text(batteryState.percentageText)
-                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .accessibilityIdentifier("battery-percentage-label")
             } else {
                 Text("--")
-                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battery-percentage-label")
 
                 Text(batteryState.unavailableReason)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.95))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .accessibilityIdentifier("battery-unavailable-label")
             }
 
             Text("Battery")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(metrics.padding)
         .accessibilityIdentifier("indicator-tile-battery")
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-        )
+        .dashboardTileContainer(cornerRadius: metrics.cornerRadius)
     }
 }

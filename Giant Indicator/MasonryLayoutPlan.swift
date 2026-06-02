@@ -10,6 +10,7 @@ import SwiftUI
 struct MasonryLayoutPlan {
     struct Item: Identifiable {
         let placeholder: IndicatorPlaceholder
+        let width: CGFloat
         let height: CGFloat
 
         var id: IndicatorKind { placeholder.kind }
@@ -22,6 +23,26 @@ struct MasonryLayoutPlan {
     let columns: [Column]
     let spacing: CGFloat
     let outerPadding: CGFloat
+
+    var layoutSignature: String {
+        let heightParts = columns.flatMap(\.items).map { Int($0.height.rounded()) }
+        return "\(columns.count)-\(heightParts.map(String.init).joined(separator: ","))"
+    }
+
+    func fitsIn(size: CGSize) -> Bool {
+        let availableHeight = max(size.height - (outerPadding * 2), 1)
+        for column in columns {
+            let heights = column.items.map(\.height)
+            guard Self.totalHeight(of: heights, spacing: spacing) <= availableHeight + 0.5 else {
+                return false
+            }
+        }
+        return true
+    }
+
+    var allItemsHavePositiveSize: Bool {
+        columns.flatMap(\.items).allSatisfy { $0.width > 0 && $0.height > 0 }
+    }
 
     static func build(indicators: [IndicatorPlaceholder], in size: CGSize) -> MasonryLayoutPlan {
         let outerPadding: CGFloat = 20
@@ -54,6 +75,7 @@ struct MasonryLayoutPlan {
 
         let resolved = bestCandidate ?? fallbackCandidate(
             indicators: indicators,
+            availableWidth: availableWidth,
             availableHeight: availableHeight,
             spacing: spacing
         )
@@ -91,37 +113,107 @@ struct MasonryLayoutPlan {
         }
 
         let maxColumnHeight = columnHeights.max() ?? 1
-        let scale = min(max(availableHeight / maxColumnHeight, 0.52), 1.0)
-        let minimumHeight: CGFloat = 130
+        let preferredScale = min(max(availableHeight / maxColumnHeight, 0), 1.0)
+        let maxItemsInAnyColumn = columns.map(\.count).max() ?? 1
+        let adaptiveMinimumHeight = adaptiveMinimumTileHeight(
+            maxItemsInColumn: maxItemsInAnyColumn,
+            availableHeight: availableHeight,
+            spacing: spacing
+        )
 
-        let builtColumns = columns.map { column in
-            Column(
-                items: column.map { placeholder in
-                    let scaledHeight = preferredTileHeight(for: placeholder.kind) * scale
-                    return Item(
-                        placeholder: placeholder,
-                        height: max(minimumHeight, scaledHeight)
-                    )
-                }
-            )
+        var builtColumns: [Column] = []
+        var balancedHeights: [CGFloat] = []
+
+        for column in columns {
+            var heights = column.map { preferredTileHeight(for: $0.kind) * preferredScale }
+            heights = heights.map { max($0, adaptiveMinimumHeight) }
+
+            guard fitHeightsToColumn(
+                &heights,
+                availableHeight: availableHeight,
+                spacing: spacing,
+                minimumHeight: adaptiveMinimumHeight
+            ) else {
+                return nil
+            }
+
+            let items = zip(column, heights).map { placeholder, height in
+                Item(placeholder: placeholder, width: tileWidth, height: height)
+            }
+            builtColumns.append(Column(items: items))
+            balancedHeights.append(totalHeight(of: heights, spacing: spacing))
         }
 
-        let score = (scale * 10_000) + tileWidth
+        let readabilityScore = preferredScale * 10_000
+        let widthScore = tileWidth * 10
+        let balancePenalty = (balancedHeights.max() ?? 0) - (balancedHeights.min() ?? 0)
+        let score = readabilityScore + widthScore - balancePenalty
         return LayoutCandidate(columns: builtColumns, score: score)
     }
 
     private static func fallbackCandidate(
         indicators: [IndicatorPlaceholder],
+        availableWidth: CGFloat,
         availableHeight: CGFloat,
         spacing: CGFloat
     ) -> LayoutCandidate {
         let count = max(indicators.count, 1)
         let totalSpacing = spacing * CGFloat(max(count - 1, 0))
-        let height = max((availableHeight - totalSpacing) / CGFloat(count), 130)
+        let perItemHeight = max((availableHeight - totalSpacing) / CGFloat(count), 1)
+        let minimumHeight = adaptiveMinimumTileHeight(
+            maxItemsInColumn: count,
+            availableHeight: availableHeight,
+            spacing: spacing
+        )
+        let height = max(perItemHeight, minimumHeight)
+        let tileWidth = max(availableWidth, 1)
         let column = Column(
-            items: indicators.map { Item(placeholder: $0, height: height) }
+            items: indicators.map { Item(placeholder: $0, width: tileWidth, height: height) }
         )
         return LayoutCandidate(columns: [column], score: 0)
+    }
+
+    private static func fitHeightsToColumn(
+        _ heights: inout [CGFloat],
+        availableHeight: CGFloat,
+        spacing: CGFloat,
+        minimumHeight: CGFloat
+    ) -> Bool {
+        let currentTotal = totalHeight(of: heights, spacing: spacing)
+        let overflow = currentTotal - availableHeight
+        guard overflow > 0.5 else { return true }
+
+        let shrinkable = heights.reduce(CGFloat(0)) { partial, value in
+            partial + max(value - minimumHeight, 0)
+        }
+        guard shrinkable >= overflow else { return false }
+
+        for index in heights.indices {
+            let room = max(heights[index] - minimumHeight, 0)
+            guard room > 0 else { continue }
+            let reduction = overflow * (room / shrinkable)
+            heights[index] = max(minimumHeight, heights[index] - reduction)
+        }
+
+        return totalHeight(of: heights, spacing: spacing) <= (availableHeight + 0.5)
+    }
+
+    private static func totalHeight(of heights: [CGFloat], spacing: CGFloat) -> CGFloat {
+        guard !heights.isEmpty else { return 0 }
+        let spacingTotal = spacing * CGFloat(max(heights.count - 1, 0))
+        return heights.reduce(0, +) + spacingTotal
+    }
+
+    private static func adaptiveMinimumTileHeight(
+        maxItemsInColumn: Int,
+        availableHeight: CGFloat,
+        spacing: CGFloat
+    ) -> CGFloat {
+        let itemCount = max(maxItemsInColumn, 1)
+        let totalSpacing = spacing * CGFloat(max(itemCount - 1, 0))
+        let perTileBudget = max((availableHeight - totalSpacing) / CGFloat(itemCount), 1)
+        let readabilityLowerBound = max(44, perTileBudget * 0.55)
+        return min(130, readabilityLowerBound, perTileBudget)
     }
 
     private static func preferredTileHeight(for kind: IndicatorKind) -> CGFloat {

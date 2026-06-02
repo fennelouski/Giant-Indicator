@@ -9,31 +9,35 @@ import SwiftUI
 
 struct IndicatorTile: View {
     let placeholder: IndicatorPlaceholder
+    let metrics: TileMetrics
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: metrics.contentSpacing) {
             Image(systemName: placeholder.symbol)
-                .font(.system(size: 64, weight: .bold))
+                .font(.system(size: metrics.symbolFontSize, weight: .bold))
                 .foregroundStyle(.white)
 
             Text(placeholder.value)
-                .font(.system(size: 44, weight: .heavy, design: .rounded))
+                .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.6)
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .accessibilityIdentifier("\(placeholder.kind.rawValue)-value-label")
 
             Text(placeholder.title)
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
             if let subtitle = placeholder.subtitle {
                 Text(subtitle)
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: metrics.subtitleFontSize, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.86))
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
                     .accessibilityIdentifier("\(placeholder.kind.rawValue)-subtitle-label")
             }
 
@@ -41,16 +45,9 @@ struct IndicatorTile: View {
                 WeatherAttributionView(attribution: attribution)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(metrics.padding)
         .accessibilityIdentifier("indicator-tile-\(placeholder.kind.rawValue)")
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-        )
+        .dashboardTileContainer(cornerRadius: metrics.cornerRadius)
     }
 }

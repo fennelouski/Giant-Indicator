@@ -9,46 +9,41 @@ import SwiftUI
 
 struct PlaybackIndicatorTile: View {
     let playbackState: PlaybackState
+    let metrics: TileMetrics
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: metrics.contentSpacing) {
             Image(systemName: playbackState.symbolName)
-                .font(.system(size: 68, weight: .bold))
+                .font(.system(size: metrics.symbolFontSize, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(height: 82)
+                .frame(height: metrics.iconHeight)
                 .padding(.horizontal, 8)
                 .accessibilityHidden(true)
 
             Text(playbackState.titleText)
-                .font(.system(size: 52, weight: .heavy, design: .rounded))
+                .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
                 .accessibilityIdentifier("playback-state-label")
 
             Text("Playback")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
 
             Text(playbackState.subtitleText)
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: metrics.subtitleFontSize, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.86))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .accessibilityIdentifier("playback-subtitle-label")
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(metrics.padding)
         .accessibilityIdentifier("indicator-tile-playback")
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-        )
+        .dashboardTileContainer(cornerRadius: metrics.cornerRadius)
     }
 }
