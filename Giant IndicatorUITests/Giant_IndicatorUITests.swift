@@ -14,6 +14,16 @@ final class Giant_IndicatorUITests: XCTestCase {
     private let weatherDeniedArgument = "--ui-testing-weather-denied"
     private let weatherAttributionArgument = "--ui-testing-weather-attribution"
     private let connectivityOverrideArgument = "--ui-testing-connectivity-override"
+    private let enabledIndicatorTileIdentifiers = [
+        "indicator-tile-weather",
+        "indicator-tile-battery",
+        "indicator-tile-volume",
+        "indicator-tile-playback",
+        "indicator-tile-wifi",
+        "indicator-tile-speaker",
+        "indicator-tile-bluetooth",
+        "indicator-tile-ringer"
+    ]
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -151,6 +161,16 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     @MainActor
+    func testMasonryLayoutShowsAllEnabledTilesWithoutScrollingInCompactSize() throws {
+        try assertMasonryDashboardLayout(interfaceOrientation: .portrait)
+    }
+
+    @MainActor
+    func testMasonryLayoutShowsAllEnabledTilesWithoutScrollingInRegularSize() throws {
+        try assertMasonryDashboardLayout(interfaceOrientation: .landscapeLeft)
+    }
+
+    @MainActor
     func testConnectivityTilesShowConfiguredState() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [
@@ -185,6 +205,47 @@ final class Giant_IndicatorUITests: XCTestCase {
             app.launchArguments = [resetIndicatorPreferencesArgument]
         }
         return app
+    }
+
+    @MainActor
+    private func assertMasonryDashboardLayout(interfaceOrientation: UIDeviceOrientation) throws {
+        XCUIDevice.shared.orientation = interfaceOrientation
+
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [
+            // Keep weather deterministic in UI tests.
+            weatherDeniedArgument,
+            batteryLevelArgument, "50",
+            playbackStateArgument, "playing",
+            "--ui-testing-volume-level", "30",
+            connectivityOverrideArgument,
+            "--ui-testing-wifi-status", "connected",
+            "--ui-testing-speaker-status", "speaker",
+            "--ui-testing-bluetooth-status", "off",
+            "--ui-testing-ringer-status", "silent"
+        ]
+
+        app.launch()
+
+        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
+
+        XCTAssertEqual(
+            app.scrollViews.count,
+            0,
+            "Dashboard masonry layout must not rely on scrolling (PR-9)."
+        )
+
+        for tileIdentifier in enabledIndicatorTileIdentifiers {
+            let tile = app.otherElements[tileIdentifier]
+            XCTAssertTrue(
+                tile.waitForExistence(timeout: 3),
+                "Expected enabled tile \(tileIdentifier) to exist."
+            )
+            XCTAssertTrue(
+                tile.isHittable,
+                "Expected enabled tile \(tileIdentifier) to be on-screen and hittable."
+            )
+        }
     }
 
     private func assertPlaybackState(
