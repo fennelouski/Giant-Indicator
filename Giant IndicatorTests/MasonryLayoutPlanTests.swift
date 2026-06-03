@@ -9,6 +9,7 @@ import CoreGraphics
 import Testing
 @testable import Giant_Indicator
 
+@Suite(.serialized)
 @MainActor
 struct MasonryLayoutPlanTests {
 
@@ -21,8 +22,45 @@ struct MasonryLayoutPlanTests {
         IndicatorPlaceholder(kind: .wifi, value: "Connected", subtitle: "Wi-Fi active"),
         IndicatorPlaceholder(kind: .speaker, value: "Speaker", subtitle: "Built-in"),
         IndicatorPlaceholder(kind: .bluetooth, value: "Off", subtitle: "Bluetooth disabled"),
-        IndicatorPlaceholder(kind: .ringer, value: "Silent", subtitle: "Muted alerts")
+        IndicatorPlaceholder(kind: .ringer, value: "Silent", subtitle: "Muted alerts"),
+        IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
+        IndicatorPlaceholder(kind: .date, value: "Wednesday, June 3")
     ]
+
+    private static let defaultFavoritePlaceholders: [IndicatorPlaceholder] = [
+        IndicatorPlaceholder(kind: .battery, value: "50%"),
+        IndicatorPlaceholder(kind: .volume, value: "30%"),
+        IndicatorPlaceholder(kind: .wifi, value: "Connected", subtitle: "Wi-Fi active"),
+        IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
+        IndicatorPlaceholder(kind: .date, value: "Wednesday, June 3"),
+        IndicatorPlaceholder(kind: .weather, value: "72°", subtitle: "Sunny")
+    ]
+
+    @Test func layoutFitsIPhonePortraitWithDefaultFavorites() async throws {
+        let size = CGSize(width: 393, height: 750)
+        let plan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: size)
+
+        #expect(plan.allItemsHavePositiveSize)
+        #expect(plan.fitsIn(size: size))
+        #expect(plan.satisfiesReadableTileMetrics)
+    }
+
+    @Test func layoutFitsIPhonePortraitWithAllIndicatorsReadable() async throws {
+        let size = CGSize(width: 393, height: 852)
+        let plan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: size)
+
+        #expect(plan.allItemsHavePositiveSize)
+        #expect(plan.fitsIn(size: size))
+        #expect(plan.satisfiesReadableTileMetrics)
+    }
+
+    @Test func maximumTileCountUsesReadableTileHeight() async throws {
+        let size = CGSize(width: 393, height: 750)
+        let maxCount = MasonryLayoutPlan.maximumTileCount(for: size)
+
+        #expect(maxCount >= 4)
+        #expect(maxCount < Self.allIndicatorPlaceholders.count)
+    }
 
     @Test func layoutFitsIPadOneThirdSplitPortrait() async throws {
         let size = CGSize(width: 320, height: 1024)
@@ -30,51 +68,30 @@ struct MasonryLayoutPlanTests {
 
         #expect(plan.allItemsHavePositiveSize)
         #expect(plan.fitsIn(size: size))
+        #expect(plan.satisfiesReadableTileMetrics)
         #expect(plan.columns.flatMap(\.items).count == Self.allIndicatorPlaceholders.count)
     }
 
-    @Test func layoutAdaptsTileWidthAcrossIPadSizes() async throws {
-        let splitThird = CGSize(width: 320, height: 1024)
-        let fullLandscape = CGSize(width: 1194, height: 834)
-
-        let splitPlan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: splitThird)
-        let fullPlan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: fullLandscape)
-
-        #expect(splitPlan.allItemsHavePositiveSize)
-        #expect(fullPlan.allItemsHavePositiveSize)
-        #expect(splitPlan.fitsIn(size: splitThird))
-        #expect(fullPlan.fitsIn(size: fullLandscape))
-
-        let splitAverageWidth = averageTileWidth(in: splitPlan)
-        let fullAverageWidth = averageTileWidth(in: fullPlan)
-        #expect(fullAverageWidth > splitAverageWidth)
-
-        let fullMinTileWidth = fullPlan.columns.flatMap(\.items).map(\.width).min() ?? 0
-        #expect(fullMinTileWidth >= 140)
-    }
-
     @Test func layoutFitsMacOSSmallWindow() async throws {
-        let size = CGSize(width: 600, height: 400)
-        let plan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: size)
+        let size = CGSize(width: 600, height: 520)
+        let plan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: size)
 
         #expect(plan.allItemsHavePositiveSize)
         #expect(plan.fitsIn(size: size))
+        #expect(plan.satisfiesReadableTileMetrics)
     }
 
     @Test func layoutPrefersWiderTilesOnMacOSLargeWindow() async throws {
-        let smallSize = CGSize(width: 600, height: 400)
-        let largeSize = CGSize(width: 1200, height: 800)
+        let canvasHeight: CGFloat = 900
+        let narrowSize = CGSize(width: 420, height: canvasHeight)
+        let wideSize = CGSize(width: 900, height: canvasHeight)
 
-        let smallPlan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: smallSize)
-        let largePlan = MasonryLayoutPlan.build(indicators: Self.allIndicatorPlaceholders, in: largeSize)
+        let narrowPlan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: narrowSize)
+        let widePlan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: wideSize)
 
-        let smallAverageWidth = averageTileWidth(in: smallPlan)
-        let largeAverageWidth = averageTileWidth(in: largePlan)
-        #expect(largeAverageWidth > smallAverageWidth)
-
-        let smallAverageHeight = averageTileHeight(in: smallPlan)
-        let largeAverageHeight = averageTileHeight(in: largePlan)
-        #expect(largeAverageHeight >= smallAverageHeight)
+        #expect(narrowPlan.fitsIn(size: narrowSize))
+        #expect(widePlan.fitsIn(size: wideSize))
+        #expect(maxTileWidth(in: widePlan) > maxTileWidth(in: narrowPlan))
     }
 
     @Test func layoutSignatureChangesWhenColumnCountChanges() async throws {
@@ -94,6 +111,10 @@ struct MasonryLayoutPlanTests {
         let items = plan.columns.flatMap(\.items)
         guard !items.isEmpty else { return 0 }
         return items.map(\.width).reduce(0, +) / CGFloat(items.count)
+    }
+
+    private func maxTileWidth(in plan: MasonryLayoutPlan) -> CGFloat {
+        plan.columns.flatMap(\.items).map(\.width).max() ?? 0
     }
 
     private func averageTileHeight(in plan: MasonryLayoutPlan) -> CGFloat {

@@ -7,14 +7,26 @@
 
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 @main
 struct Giant_IndicatorApp: App {
     @StateObject private var weatherViewModel = WeatherViewModel()
 
     init() {
+        #if canImport(UIKit)
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        #endif
+
         if ProcessInfo.processInfo.arguments.contains("--ui-testing-reset-indicator-preferences") {
             IndicatorPreferences.resetVisibility()
             DisplayPreferences.reset()
+            PermissionEducationPreferences.reset()
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing-show-wifi-network-name") {
+            DisplayPreferences.showWiFiNetworkName = true
         }
     }
 
@@ -22,9 +34,6 @@ struct Giant_IndicatorApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(weatherViewModel)
-                .task {
-                    await weatherViewModel.refreshOnLaunch()
-                }
                 #if os(macOS)
                 .frame(minWidth: 520, minHeight: 400)
                 #endif

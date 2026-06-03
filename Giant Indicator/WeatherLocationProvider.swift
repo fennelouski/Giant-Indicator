@@ -3,6 +3,7 @@ import Foundation
 
 enum WeatherLocationResolution: Equatable {
     case authorized(CLLocation)
+    case notDetermined
     case denied
     case restricted
     case unavailable
@@ -12,8 +13,20 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<WeatherLocationResolution, Never>?
 
-    func resolveLocation() async -> WeatherLocationResolution {
-        if let location = manager.location {
+    var authorizationStatus: CLAuthorizationStatus {
+        manager.authorizationStatus
+    }
+
+    func requestWhenInUseAccess() {
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        manager.requestWhenInUseAuthorization()
+    }
+
+    func resolveLocation(requestAuthorization: Bool) async -> WeatherLocationResolution {
+        if let location = manager.location,
+           manager.authorizationStatus == .authorizedAlways ||
+           manager.authorizationStatus == .authorizedWhenInUse {
             return .authorized(location)
         }
 
@@ -24,7 +37,11 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .notDetermined:
-            manager.requestWhenInUseAuthorization()
+            if requestAuthorization {
+                manager.requestWhenInUseAuthorization()
+            } else {
+                return .notDetermined
+            }
         case .denied:
             return .denied
         case .restricted:
@@ -74,6 +91,8 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
         switch resolution {
         case .authorized:
             return .authorized
+        case .notDetermined:
+            return .notRequested
         case .denied:
             return .denied
         case .restricted:
@@ -91,6 +110,8 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
     private func message(for resolution: WeatherLocationResolution) -> String {
         switch resolution {
         case .authorized:
+            return ""
+        case .notDetermined:
             return ""
         case .denied:
             return "Location access is off. Turn on Location Services in Settings to see local weather."
@@ -122,8 +143,12 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
         return value.isEmpty ? nil : value
     }
 
-    func resolveWeatherLocation() async -> (location: CLLocation?, permission: WeatherPermissionState, message: String?) {
-        let initialResolution = await resolveLocation()
+    func resolveWeatherLocation(requestAuthorization: Bool) async -> (
+        location: CLLocation?,
+        permission: WeatherPermissionState,
+        message: String?
+    ) {
+        let initialResolution = await resolveLocation(requestAuthorization: requestAuthorization)
         let resolved = resolvedLocationWithTestingSupport(initialResolution)
         return (
             location: location(from: resolved),

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WeatherAttributionView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dashboardPalette) private var palette
     let attribution: WeatherAttributionData
 
     var body: some View {
@@ -18,30 +19,30 @@ struct WeatherAttributionView: View {
                         default:
                             Text("Apple Weather")
                                 .font(.caption)
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(palette.mutedText)
                         }
                     }
                 } else {
                     Text("Apple Weather")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(palette.mutedText)
                 }
                 if let legalPageURL = attribution.legalPageURL {
                     Link("Data sources and legal details", destination: legalPageURL)
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(palette.mutedText)
                 }
             }
 
             if let legalText = attribution.legalAttributionText, !legalText.isEmpty {
                 Text(legalText)
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.75))
+                    .foregroundStyle(palette.secondaryText)
                     .multilineTextAlignment(.center)
             } else if attribution.legalPageURL == nil {
                 Text("Weather information is provided by Apple Weather and its data providers.")
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.75))
+                    .foregroundStyle(palette.secondaryText)
                     .multilineTextAlignment(.center)
             }
         }

@@ -7,6 +7,15 @@
 
 import Foundation
 
+enum SettingsGroup: String, CaseIterable {
+    case battery
+    case wifi
+    case timeAndDate
+    case media
+    case connectivity
+    case weather
+}
+
 enum IndicatorKind: String, CaseIterable, Identifiable {
     case weather
     case battery
@@ -17,6 +26,8 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
     case speaker
     case bluetooth
     case ringer
+    case clock
+    case date
 
     var id: String { rawValue }
 
@@ -46,6 +57,10 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "Bluetooth"
         case .ringer:
             return "Ringer/Silent"
+        case .clock:
+            return "Time"
+        case .date:
+            return "Date"
         }
     }
 
@@ -69,13 +84,38 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "dot.radiowaves.left.and.right"
         case .ringer:
             return "bell.fill"
+        case .clock:
+            return "clock.fill"
+        case .date:
+            return "calendar"
         }
+    }
+
+    /// When `false`, the indicator stays out of the dashboard and settings; tile UI remains for a future fix.
+    var isFeatureEnabled: Bool {
+        switch self {
+        case .bluetooth:
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// Default dashboard favorites for fresh installs (readable without scrolling on phone).
+    static var defaultDashboardFavorites: Set<IndicatorKind> {
+        [.battery, .volume, .wifi, .clock, .date, .weather]
+    }
+
+    var defaultVisibility: Bool {
+        isFeatureEnabled &&
+            platformCapabilityHandling != .hidden &&
+            Self.defaultDashboardFavorites.contains(self)
     }
 
     static var defaultVisibilityState: [IndicatorKind: Bool] {
         Dictionary(
             uniqueKeysWithValues: allCases.map { kind in
-                (kind, kind.platformCapabilityHandling != .hidden)
+                (kind, kind.defaultVisibility)
             }
         )
     }
@@ -104,6 +144,27 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
     }
 
     var isVisibleInSettings: Bool {
-        platformCapabilityHandling != .hidden
+        isFeatureEnabled && platformCapabilityHandling != .hidden
+    }
+
+    var settingsGroup: SettingsGroup {
+        switch self {
+        case .battery:
+            return .battery
+        case .wifi:
+            return .wifi
+        case .clock, .date:
+            return .timeAndDate
+        case .volume, .playback, .nowPlaying:
+            return .media
+        case .speaker, .bluetooth, .ringer:
+            return .connectivity
+        case .weather:
+            return .weather
+        }
+    }
+
+    static func visibleInSettings(for group: SettingsGroup) -> [IndicatorKind] {
+        allCases.filter { $0.settingsGroup == group && $0.isVisibleInSettings }
     }
 }

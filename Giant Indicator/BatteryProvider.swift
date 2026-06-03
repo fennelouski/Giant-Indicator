@@ -14,6 +14,9 @@ protocol BatteryStateProviding {
 }
 
 struct SystemBatteryProvider: BatteryStateProviding {
+    /// Polling interval when notifications are sparse or unavailable (simulator, macOS).
+    static let pollingInterval: TimeInterval = 10
+
     private let processInfo: ProcessInfo
 
     init(processInfo: ProcessInfo = .processInfo) {
@@ -29,16 +32,23 @@ struct SystemBatteryProvider: BatteryStateProviding {
         let device = UIDevice.current
         device.isBatteryMonitoringEnabled = true
 
+        let snapshot = { snapshotUIKitBatteryState(device: device) }
+
         let notificationPublisher = NotificationCenter.default.publisher(for: UIDevice.batteryLevelDidChangeNotification)
             .merge(with: NotificationCenter.default.publisher(for: UIDevice.batteryStateDidChangeNotification))
-            .map { _ in snapshotUIKitBatteryState(device: device) }
+            .map { _ in snapshot() }
 
-        return Just(snapshotUIKitBatteryState(device: device))
-            .merge(with: notificationPublisher)
+        let timerPublisher = Timer.publish(every: Self.pollingInterval, on: .main, in: .common)
+            .autoconnect()
+            .map { _ in snapshot() }
+
+        return notificationPublisher
+            .merge(with: timerPublisher)
+            .prepend(snapshot())
             .removeDuplicates()
             .eraseToAnyPublisher()
         #elseif os(macOS)
-        return Timer.publish(every: 30, on: .main, in: .common)
+        return Timer.publish(every: Self.pollingInterval, on: .main, in: .common)
             .autoconnect()
             .map { _ in snapshotMacBatteryState() }
             .prepend(snapshotMacBatteryState())
@@ -58,8 +68,18 @@ struct SystemBatteryProvider: BatteryStateProviding {
             return nil
         }
 
+        let powerConnection: BatteryPowerConnection
+        if processInfo.arguments.contains("--ui-testing-battery-plugged-in") {
+            powerConnection = .pluggedIn
+        } else if processInfo.arguments.contains("--ui-testing-battery-unplugged") {
+            powerConnection = .unplugged
+        } else {
+            powerConnection = .unplugged
+        }
+
         return BatteryState(
             percentage: level,
+            powerConnection: powerConnection,
             availability: .available
         )
     }
@@ -73,7 +93,19 @@ private func snapshotUIKitBatteryState(device: UIDevice) -> BatteryState {
     }
 
     let percentage = Int((level * 100).rounded())
-    return BatteryState(percentage: percentage, availability: .available)
+    let powerConnection = uiKitPowerConnection(from: device.batteryState)
+    return BatteryState(percentage: percentage, powerConnection: powerConnection, availability: .available)
+}
+
+private func uiKitPowerConnection(from batteryState: UIDevice.BatteryState) -> BatteryPowerConnection {
+    switch batteryState {
+    case .charging, .full:
+        return .pluggedIn
+    case .unplugged, .unknown:
+        return .unplugged
+    @unknown default:
+        return .unplugged
+    }
 }
 #endif
 
@@ -102,9 +134,22 @@ private func snapshotMacBatteryState() -> BatteryState {
         }
 
         let percentage = Int((Double(current) / Double(max) * 100).rounded())
-        return BatteryState(percentage: percentage, availability: .available)
+        let powerConnection = macPowerConnection(from: description)
+        return BatteryState(percentage: percentage, powerConnection: powerConnection, availability: .available)
     }
 
     return .unavailable
+}
+
+private func macPowerConnection(from description: [String: Any]) -> BatteryPowerConnection {
+    guard let powerSourceState = description[kIOPSPowerSourceStateKey as String] as? String else {
+        return .unplugged
+    }
+
+    if powerSourceState == kIOPSACPowerKey {
+        return .pluggedIn
+    }
+
+    return .unplugged
 }
 #endif

@@ -18,6 +18,10 @@ enum IndicatorPreferences {
         var visibility = IndicatorKind.defaultVisibilityState
 
         for kind in IndicatorKind.allCases {
+            guard kind.isFeatureEnabled else {
+                visibility[kind] = false
+                continue
+            }
             let key = kind.visibilityStorageKey
             if defaults.object(forKey: key) != nil {
                 visibility[kind] = defaults.bool(forKey: key)
@@ -28,6 +32,7 @@ enum IndicatorPreferences {
     }
 
     static func setVisibility(_ isVisible: Bool, for kind: IndicatorKind) {
+        guard kind.isFeatureEnabled else { return }
         defaults.set(isVisible, forKey: kind.visibilityStorageKey)
     }
 

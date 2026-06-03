@@ -30,6 +30,7 @@ enum WeatherDataSource: Equatable {
 
 enum WeatherPermissionState: Equatable {
     case authorized
+    case notRequested
     case denied
     case restricted
     case unavailable

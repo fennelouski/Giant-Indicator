@@ -11,15 +11,13 @@ import Testing
 
 struct TileMetricsTests {
 
-    @Test func metricsRespectMinimumReadableSizes() async throws {
-        let metrics = TileMetrics(width: 120, height: 90)
+    @Test func metricsNeverExceedAssignedTileHeight() async throws {
+        let metrics = TileMetrics(width: 120, height: 50)
 
-        #expect(metrics.symbolFontSize >= 40)
-        #expect(metrics.valueFontSize >= 34)
-        #expect(metrics.titleFontSize >= 18)
-        #expect(metrics.subtitleFontSize >= 15)
-        #expect(metrics.iconHeight >= 44)
-        #expect(metrics.padding >= 16)
+        #expect(metrics.minimumContentHeight <= metrics.height + 2)
+        #expect(metrics.iconHeight <= metrics.height * 0.5)
+        #expect(metrics.valueFontSize <= metrics.height * 0.4)
+        #expect(metrics.minimumContentHeight <= metrics.height + 2)
     }
 
     @Test func metricsScaleUpOnLargeTiles() async throws {
@@ -32,5 +30,9 @@ struct TileMetricsTests {
         #expect(large.subtitleFontSize > compact.subtitleFontSize)
         #expect(large.iconHeight > compact.iconHeight)
         #expect(large.padding > compact.padding)
+    }
+
+    @Test func minimumReadableTileHeightIsStable() async throws {
+        #expect(TileMetrics.minimumReadableTileHeight == 130)
     }
 }

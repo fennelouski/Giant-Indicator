@@ -8,15 +8,18 @@
 import SwiftUI
 
 struct BatteryIndicatorTile: View {
-    let batteryState: BatteryState
+    @Environment(\.dashboardPalette) private var palette
+    @ObservedObject var viewModel: BatteryViewModel
     let metrics: TileMetrics
+
+    private var batteryState: BatteryState { viewModel.state }
 
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
             percentageSection
 
             if batteryState.isDataAvailable {
-                BatteryIcon(level: batteryState.normalizedLevel)
+                BatteryIcon(level: batteryState.normalizedLevel, isPluggedIn: batteryState.isPluggedIn)
                     .frame(height: metrics.batteryIconHeight)
                     .padding(.horizontal, 8)
                     .accessibilityHidden(true)
@@ -30,9 +33,18 @@ struct BatteryIndicatorTile: View {
 
             Text("Battery")
                 .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(palette.titleText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+
+            if batteryState.isDataAvailable {
+                Text(batteryState.powerConnectionText)
+                    .font(.system(size: metrics.subtitleFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.subtitleText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("battery-power-connection-label")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(metrics.padding)
@@ -47,7 +59,7 @@ struct BatteryIndicatorTile: View {
         if batteryState.isDataAvailable {
             Text(batteryState.percentageText)
                 .font(.system(size: metrics.batteryPercentageFontSize, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(palette.foreground)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
                 .accessibilityIdentifier("battery-percentage-label")
@@ -64,7 +76,7 @@ struct BatteryIndicatorTile: View {
 
     private var accessibilityLabel: String {
         if batteryState.isDataAvailable {
-            return "Battery \(batteryState.percentageText)"
+            return "Battery \(batteryState.percentageText), \(batteryState.powerConnectionText)"
         }
         if batteryState.unavailableReasonText.isEmpty {
             return "Battery unavailable"

@@ -152,6 +152,9 @@ The app shall provide a setting to show time with seconds when the time tile is 
 ### PR-26 Date Display
 The app shall support a large, readable date tile, independently toggleable from time display.
 
+### PR-27 Deferred Permission Requests with Educational Consent
+The app shall defer system permission requests (for example, Location Services and Bluetooth) until the user enables a settings control that requires that permission. The first time each permission type is needed, the app shall present an in-app educational alert explaining why access is required; continuing shall enable the requested feature and proceed with the system permission flow where applicable, while canceling shall leave the feature disabled. Educational alerts shall be shown once per permission type. When permission is already granted, the app shall skip the educational alert and enable the feature immediately. Indicators that require deferred permissions shall show a clear pre-consent placeholder state on the dashboard until the user completes the enable flow.
+
 ## 5) Functional Specification Details
 
 ### 5.1 Supported Indicator Set (Phase 1)
@@ -167,6 +170,7 @@ The app shall support a large, readable date tile, independently toggleable from
 - Time
 - Time with seconds (optional format mode)
 - Date
+- Deferred permission education (location, Bluetooth) tied to indicator enablement
 
 ### 5.2 Configuration Model
 - Toggle list in settings for each indicator.
@@ -204,6 +208,8 @@ The app shall support a large, readable date tile, independently toggleable from
 - Battery-driven brightness mapping follows the squared formula with a 10% floor when enabled.
 - Status bar defaults to hidden and can be toggled where supported.
 - Time/date and optional seconds format render correctly and update in real time.
+- System permission prompts do not appear at launch before the user enables a permission-backed feature in settings.
+- First-time permission education appears once per permission type; cancel reverts the toggle and continue enables the feature.
 
 ### 8.2 Visual Acceptance
 - Battery/volume/playback/connectivity states are legible from across a typical room.

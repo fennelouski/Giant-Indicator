@@ -44,13 +44,34 @@ struct MasonryLayoutPlan {
         columns.flatMap(\.items).allSatisfy { $0.width > 0 && $0.height > 0 }
     }
 
+    var satisfiesReadableTileMetrics: Bool {
+        columns.flatMap(\.items).allSatisfy { item in
+            let metrics = TileMetrics(width: item.width, height: item.height)
+            return metrics.minimumContentHeight <= item.height + 0.5
+        }
+    }
+
+    /// Maximum indicators that can fit at readable tile height without scrolling.
+    static func maximumTileCount(for size: CGSize, spacing: CGFloat = 16, outerPadding: CGFloat = 20) -> Int {
+        let availableHeight = max(size.height - (outerPadding * 2), 1)
+        let tileHeight = TileMetrics.minimumReadableTileHeight
+        return max(Int((availableHeight + spacing) / (tileHeight + spacing)), 1)
+    }
+
     static func build(indicators: [IndicatorPlaceholder], in size: CGSize) -> MasonryLayoutPlan {
         let outerPadding: CGFloat = 20
         let spacing: CGFloat = 16
         let availableWidth = max(size.width - (outerPadding * 2), 1)
         let availableHeight = max(size.height - (outerPadding * 2), 1)
         let maxColumnsByWidth = max(Int((availableWidth + spacing) / (160 + spacing)), 1)
-        let maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
+        var maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
+        while maxColumns > 1 {
+            let tileWidth = (availableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns)
+            if tileWidth >= 220 {
+                break
+            }
+            maxColumns -= 1
+        }
 
         var bestCandidate: LayoutCandidate?
         for columnCount in 1...maxColumns {
@@ -73,12 +94,30 @@ struct MasonryLayoutPlan {
             }
         }
 
-        let resolved = bestCandidate ?? fallbackCandidate(
-            indicators: indicators,
-            availableWidth: availableWidth,
-            availableHeight: availableHeight,
-            spacing: spacing
-        )
+        let resolved: LayoutCandidate
+        if let bestCandidate {
+            resolved = bestCandidate
+        } else {
+            var retried: LayoutCandidate?
+            for columnCount in stride(from: maxColumns, through: 1, by: -1) {
+                if let candidate = makeCandidate(
+                    indicators: indicators,
+                    columnCount: columnCount,
+                    availableWidth: availableWidth,
+                    availableHeight: availableHeight,
+                    spacing: spacing
+                ) {
+                    retried = candidate
+                    break
+                }
+            }
+            resolved = retried ?? fallbackCandidate(
+                indicators: indicators,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight,
+                spacing: spacing
+            )
+        }
         return MasonryLayoutPlan(columns: resolved.columns, spacing: spacing, outerPadding: outerPadding)
     }
 
@@ -128,11 +167,20 @@ struct MasonryLayoutPlan {
             var heights = column.map { preferredTileHeight(for: $0.kind) * preferredScale }
             heights = heights.map { max($0, adaptiveMinimumHeight) }
 
+            let contentFloors = heights.map {
+                stabilizedTileHeight(
+                    width: tileWidth,
+                    initial: $0,
+                    minimumHeight: adaptiveMinimumHeight
+                )
+            }
+            heights = zip(heights, contentFloors).map { max($0, $1) }
+
             guard fitHeightsToColumn(
                 &heights,
+                contentFloors: contentFloors,
                 availableHeight: availableHeight,
-                spacing: spacing,
-                minimumHeight: adaptiveMinimumHeight
+                spacing: spacing
             ) else {
                 return nil
             }
@@ -140,14 +188,17 @@ struct MasonryLayoutPlan {
             let items = zip(column, heights).map { placeholder, height in
                 Item(placeholder: placeholder, width: tileWidth, height: height)
             }
+
             builtColumns.append(Column(items: items))
             balancedHeights.append(totalHeight(of: heights, spacing: spacing))
         }
 
         let readabilityScore = preferredScale * 10_000
-        let widthScore = tileWidth * 10
+        let widthScore = min(tileWidth, 360) * 10
         let balancePenalty = (balancedHeights.max() ?? 0) - (balancedHeights.min() ?? 0)
-        let score = readabilityScore + widthScore - balancePenalty
+        let columnCountBonus = columnCount > 1 ? CGFloat(columnCount) * 50 : 0
+        let multiColumnBonus: CGFloat = columnCount > 1 && tileWidth >= 200 ? 50_000 : 0
+        let score = readabilityScore + widthScore - balancePenalty + columnCountBonus + multiColumnBonus
         return LayoutCandidate(columns: builtColumns, score: score)
     }
 
@@ -157,42 +208,77 @@ struct MasonryLayoutPlan {
         availableHeight: CGFloat,
         spacing: CGFloat
     ) -> LayoutCandidate {
+        let maxColumnsByWidth = max(Int((availableWidth + spacing) / (140 + spacing)), 1)
+        let maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
+
+        for columnCount in stride(from: maxColumns, through: 1, by: -1) {
+            if let candidate = makeCandidate(
+                indicators: indicators,
+                columnCount: columnCount,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight,
+                spacing: spacing
+            ) {
+                return candidate
+            }
+        }
+
         let count = max(indicators.count, 1)
         let totalSpacing = spacing * CGFloat(max(count - 1, 0))
         let perItemHeight = max((availableHeight - totalSpacing) / CGFloat(count), 1)
-        let minimumHeight = adaptiveMinimumTileHeight(
-            maxItemsInColumn: count,
-            availableHeight: availableHeight,
-            spacing: spacing
-        )
-        let height = max(perItemHeight, minimumHeight)
         let tileWidth = max(availableWidth, 1)
+        let heights = indicators.map { _ in
+            stabilizedTileHeight(
+                width: tileWidth,
+                initial: perItemHeight,
+                minimumHeight: perItemHeight
+            )
+        }
         let column = Column(
-            items: indicators.map { Item(placeholder: $0, width: tileWidth, height: height) }
+            items: zip(indicators, heights).map { placeholder, height in
+                Item(placeholder: placeholder, width: tileWidth, height: height)
+            }
         )
         return LayoutCandidate(columns: [column], score: 0)
     }
 
+    private static func stabilizedTileHeight(
+        width: CGFloat,
+        initial: CGFloat,
+        minimumHeight: CGFloat
+    ) -> CGFloat {
+        var target = initial
+        for _ in 0..<4 {
+            let required = TileMetrics(width: width, height: target).minimumContentHeight
+            if required <= target + 0.5 {
+                break
+            }
+            target = required
+        }
+        return max(minimumHeight, target)
+    }
+
     private static func fitHeightsToColumn(
         _ heights: inout [CGFloat],
+        contentFloors: [CGFloat],
         availableHeight: CGFloat,
-        spacing: CGFloat,
-        minimumHeight: CGFloat
+        spacing: CGFloat
     ) -> Bool {
         let currentTotal = totalHeight(of: heights, spacing: spacing)
         let overflow = currentTotal - availableHeight
         guard overflow > 0.5 else { return true }
 
-        let shrinkable = heights.reduce(CGFloat(0)) { partial, value in
-            partial + max(value - minimumHeight, 0)
+        let shrinkable = zip(heights, contentFloors).reduce(CGFloat(0)) { partial, pair in
+            partial + max(pair.0 - pair.1, 0)
         }
         guard shrinkable >= overflow else { return false }
 
         for index in heights.indices {
-            let room = max(heights[index] - minimumHeight, 0)
+            let floor = contentFloors[index]
+            let room = max(heights[index] - floor, 0)
             guard room > 0 else { continue }
             let reduction = overflow * (room / shrinkable)
-            heights[index] = max(minimumHeight, heights[index] - reduction)
+            heights[index] = max(floor, heights[index] - reduction)
         }
 
         return totalHeight(of: heights, spacing: spacing) <= (availableHeight + 0.5)
@@ -204,16 +290,27 @@ struct MasonryLayoutPlan {
         return heights.reduce(0, +) + spacingTotal
     }
 
-    private static func adaptiveMinimumTileHeight(
+    private static func perTileHeightBudget(
         maxItemsInColumn: Int,
         availableHeight: CGFloat,
         spacing: CGFloat
     ) -> CGFloat {
         let itemCount = max(maxItemsInColumn, 1)
         let totalSpacing = spacing * CGFloat(max(itemCount - 1, 0))
-        let perTileBudget = max((availableHeight - totalSpacing) / CGFloat(itemCount), 1)
-        let readabilityLowerBound = max(44, perTileBudget * 0.55)
-        return min(130, readabilityLowerBound, perTileBudget)
+        return max((availableHeight - totalSpacing) / CGFloat(itemCount), 1)
+    }
+
+    private static func adaptiveMinimumTileHeight(
+        maxItemsInColumn: Int,
+        availableHeight: CGFloat,
+        spacing: CGFloat
+    ) -> CGFloat {
+        let perTileBudget = perTileHeightBudget(
+            maxItemsInColumn: maxItemsInColumn,
+            availableHeight: availableHeight,
+            spacing: spacing
+        )
+        return min(TileMetrics.minimumReadableTileHeight, perTileBudget)
     }
 
     private static func preferredTileHeight(for kind: IndicatorKind) -> CGFloat {
@@ -230,6 +327,10 @@ struct MasonryLayoutPlan {
             return 280
         case .wifi, .speaker, .bluetooth, .ringer:
             return 220
+        case .clock:
+            return 240
+        case .date:
+            return 260
         }
     }
 }

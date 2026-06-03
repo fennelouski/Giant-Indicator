@@ -5,9 +5,38 @@ enum BatteryAvailability: Equatable {
     case unavailable(reason: String)
 }
 
+enum BatteryPowerConnection: Equatable {
+    case pluggedIn
+    case unplugged
+}
+
 struct BatteryState: Equatable, IndicatorUnavailablePresenting {
     let percentage: Int
+    let powerConnection: BatteryPowerConnection
     let availability: BatteryAvailability
+
+    init(
+        percentage: Int,
+        powerConnection: BatteryPowerConnection = .unplugged,
+        availability: BatteryAvailability
+    ) {
+        self.percentage = percentage
+        self.powerConnection = powerConnection
+        self.availability = availability
+    }
+
+    var isPluggedIn: Bool {
+        powerConnection == .pluggedIn
+    }
+
+    var powerConnectionText: String {
+        switch powerConnection {
+        case .pluggedIn:
+            return "Plugged In"
+        case .unplugged:
+            return "Unplugged"
+        }
+    }
 
     var normalizedLevel: CGFloat {
         CGFloat(percentage).clamped(to: 0...100) / 100
@@ -41,7 +70,11 @@ struct BatteryState: Equatable, IndicatorUnavailablePresenting {
         max(0, totalWidth) * normalizedLevel
     }
 
-    static let unavailable = BatteryState(percentage: 0, availability: .unavailable(reason: "Unavailable"))
+    static let unavailable = BatteryState(
+        percentage: 0,
+        powerConnection: .unplugged,
+        availability: .unavailable(reason: "Unavailable")
+    )
 }
 
 private extension Int {

@@ -4,5 +4,7 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth access is used to show whether Bluetooth is on or off in the Bluetooth indicator.</string>
 </dict>
 </plist>

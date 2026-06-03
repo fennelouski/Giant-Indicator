@@ -11,6 +11,15 @@ final class ConnectivityViewModel: ObservableObject {
     init(provider: ConnectivityProviding = SystemConnectivityProvider()) {
         self.provider = provider
         observe()
+        provider.updateShowWiFiNetworkName(DisplayPreferences.showWiFiNetworkName)
+    }
+
+    func updateShowWiFiNetworkName(_ enabled: Bool) {
+        provider.updateShowWiFiNetworkName(enabled)
+    }
+
+    func updateBluetoothMonitoringEnabled(_ enabled: Bool) {
+        provider.updateBluetoothMonitoringEnabled(enabled)
     }
 
     private func observe() {

@@ -9,16 +9,18 @@ import SwiftUI
 
 private struct DashboardTileContainerModifier: ViewModifier {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.dashboardPalette) private var palette
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
         content
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(tileFillOpacity))
+                    .fill(palette.foreground(opacity: tileFillOpacity))
                     .overlay {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(tileStrokeOpacity), lineWidth: tileStrokeWidth)
+                            .stroke(palette.foreground(opacity: tileStrokeOpacity), lineWidth: tileStrokeWidth)
                     }
             }
     }

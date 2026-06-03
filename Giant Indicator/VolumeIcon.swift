@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct VolumeIcon: View {
+    @Environment(\.dashboardPalette) private var palette
     let level: CGFloat
     let symbolName: String
 
@@ -21,15 +22,15 @@ struct VolumeIcon: View {
             HStack(spacing: 16) {
                 Image(systemName: symbolName)
                     .font(.system(size: max(26, proxy.size.height * 0.5), weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(palette.foreground)
                     .frame(width: iconAreaWidth, alignment: .leading)
 
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
-                        .fill(Color.white.opacity(0.34))
+                        .fill(palette.trackFill)
 
                     RoundedRectangle(cornerRadius: barHeight / 2, style: .continuous)
-                        .fill(Color.white)
+                        .fill(palette.foreground)
                         .frame(width: barAreaWidth * clampedLevel)
                 }
                 .frame(width: barAreaWidth, height: barHeight)

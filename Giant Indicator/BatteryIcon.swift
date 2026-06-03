@@ -8,7 +8,9 @@
 import SwiftUI
 
 struct BatteryIcon: View {
+    @Environment(\.dashboardPalette) private var palette
     let level: CGFloat
+    var isPluggedIn: Bool = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -21,10 +23,10 @@ struct BatteryIcon: View {
 
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white, lineWidth: strokeWidth)
+                    .stroke(palette.foreground, lineWidth: strokeWidth)
                     .overlay(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white)
+                            .fill(palette.foreground)
                             .frame(width: contentWidth * clampedLevel)
                             .padding(contentPadding)
                             .accessibilityHidden(true)
@@ -32,8 +34,17 @@ struct BatteryIcon: View {
                     .frame(width: shellWidth)
 
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color.white)
+                    .fill(palette.foreground)
                     .frame(width: capWidth, height: max(18, proxy.size.height * 0.42))
+            }
+            .overlay {
+                if isPluggedIn {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: max(20, proxy.size.height * 0.42), weight: .bold))
+                        .foregroundStyle(palette.background)
+                        .shadow(color: palette.foreground.opacity(0.35), radius: 1, y: 1)
+                        .accessibilityHidden(true)
+                }
             }
         }
     }

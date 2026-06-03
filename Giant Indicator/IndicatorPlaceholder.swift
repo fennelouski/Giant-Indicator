@@ -32,6 +32,16 @@ struct IndicatorPlaceholder: Identifiable {
         )
     }
 
+    static func fromWiFiState(_ state: WiFiIndicatorState) -> IndicatorPlaceholder {
+        IndicatorPlaceholder(
+            kind: .wifi,
+            value: state.primaryValueText,
+            subtitle: state.subtitleText,
+            symbolOverride: state.symbolName,
+            showsUnavailableFallback: !state.isDataAvailable
+        )
+    }
+
     static func fromWeatherState(_ state: WeatherDisplayState) -> IndicatorPlaceholder {
         guard let snapshot = state.snapshot else {
             let subtitle: String
@@ -46,17 +56,32 @@ struct IndicatorPlaceholder: Identifiable {
             case .unavailable:
                 subtitle = "Location currently unavailable"
                 symbolName = "location.slash.fill"
+            case .notRequested:
+                subtitle = "Enable in Settings to load weather"
+                symbolName = "cloud.sun.fill"
             case .authorized, .none:
                 subtitle = "Current Location"
                 symbolName = "cloud.sun.fill"
             }
 
-            let isLoading = state.errorMessage == nil && state.permissionState != .denied &&
-                state.permissionState != .restricted && state.permissionState != .unavailable
+            let isLoading = state.errorMessage == nil &&
+                state.permissionState != .denied &&
+                state.permissionState != .restricted &&
+                state.permissionState != .unavailable &&
+                state.permissionState != .notRequested
+
+            let valueText: String
+            if let errorMessage = state.errorMessage {
+                valueText = errorMessage
+            } else if state.permissionState == .notRequested {
+                valueText = "Weather"
+            } else {
+                valueText = IndicatorFallbackPresentation.unknownValueText
+            }
 
             return IndicatorPlaceholder(
                 kind: .weather,
-                value: state.errorMessage ?? IndicatorFallbackPresentation.unknownValueText,
+                value: valueText,
                 subtitle: isLoading ? "Loading…" : subtitle,
                 attribution: nil,
                 symbolOverride: symbolName,

@@ -10,8 +10,22 @@ import AVFoundation
 import CoreBluetooth
 #endif
 
+#if canImport(CoreWLAN)
+import CoreWLAN
+#endif
+
+#if canImport(UIKit)
+import UIKit
+#endif
+
+#if canImport(NetworkExtension)
+import NetworkExtension
+#endif
+
 protocol ConnectivityProviding {
     func connectivityPublisher() -> AnyPublisher<ConnectivityState, Never>
+    func updateShowWiFiNetworkName(_ enabled: Bool)
+    func updateBluetoothMonitoringEnabled(_ enabled: Bool)
 }
 
 final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
@@ -25,16 +39,47 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     #endif
 
     private var wifiConnected = false
+    private var wifiNetworkName: String?
+    private var showWiFiNetworkName = DisplayPreferences.showWiFiNetworkName
     private var bluetoothValue = "Off"
     private var bluetoothSubtitle = "Bluetooth is turned off"
-    private var bluetoothSymbol = "bolt.horizontal.slash"
+    private var bluetoothSymbol = "antenna.radiowaves.left.and.right.slash"
     private var bluetoothAvailability: ConnectivityAvailability = .available
     private var cancellables = Set<AnyCancellable>()
     private var hasStartedMonitoring = false
+    private var isBluetoothMonitoringEnabled = false
 
     init(processInfo: ProcessInfo = .processInfo) {
         self.processInfo = processInfo
         super.init()
+        if processInfo.arguments.contains("--ui-testing-show-wifi-network-name") {
+            showWiFiNetworkName = true
+        }
+    }
+
+    func updateShowWiFiNetworkName(_ enabled: Bool) {
+        guard showWiFiNetworkName != enabled else { return }
+        showWiFiNetworkName = enabled
+        if !enabled {
+            wifiNetworkName = nil
+        }
+        refreshNetworkNameIfNeeded()
+        publishSnapshot()
+    }
+
+    func updateBluetoothMonitoringEnabled(_ enabled: Bool) {
+        guard isBluetoothMonitoringEnabled != enabled else { return }
+        isBluetoothMonitoringEnabled = enabled
+
+        #if canImport(CoreBluetooth)
+        if enabled {
+            startBluetoothMonitoringIfNeeded()
+        } else {
+            stopBluetoothMonitoring()
+        }
+        #endif
+
+        publishSnapshot()
     }
 
     func connectivityPublisher() -> AnyPublisher<ConnectivityState, Never> {
@@ -55,12 +100,18 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         wifiMonitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
             self.wifiConnected = path.status == .satisfied
+            if !self.wifiConnected {
+                self.wifiNetworkName = nil
+            }
+            self.refreshNetworkNameIfNeeded()
             self.publishSnapshot()
         }
         wifiMonitor.start(queue: monitorQueue)
 
         #if canImport(CoreBluetooth)
-        bluetoothManager = CBCentralManager(delegate: self, queue: monitorQueue)
+        if isBluetoothMonitoringEnabled {
+            startBluetoothMonitoringIfNeeded()
+        }
         #else
         bluetoothValue = "--"
         bluetoothSubtitle = "Bluetooth controls are unavailable on this platform"
@@ -74,6 +125,28 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
             .store(in: &cancellables)
         #endif
 
+        #if os(macOS) && canImport(CoreWLAN)
+        Timer.publish(every: 5, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self, self.wifiConnected else { return }
+                self.refreshNetworkNameIfNeeded()
+                self.publishSnapshot()
+            }
+            .store(in: &cancellables)
+        #endif
+
+        #if canImport(UIKit)
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshNetworkNameIfNeeded()
+                self.publishSnapshot()
+            }
+            .store(in: &cancellables)
+        #endif
+
+        refreshNetworkNameIfNeeded()
         publishSnapshot()
     }
 
@@ -94,14 +167,85 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         subject.send(snapshot)
     }
 
-    private func makeWiFiState() -> ConnectivityIndicatorState {
-        ConnectivityIndicatorState(
-            title: "Wi-Fi",
-            valueText: wifiConnected ? "Connected" : "Disconnected",
-            subtitleText: wifiConnected ? "Wi-Fi active" : "No Wi-Fi link",
-            symbolName: wifiConnected ? "wifi" : "wifi.slash",
-            availability: .available
+    private func makeWiFiState() -> WiFiIndicatorState {
+        let showsName = showWiFiNetworkName
+
+        guard wifiConnected else {
+            return .disconnected(showsNetworkName: showsName)
+        }
+
+        return .connected(
+            signal: resolvedSignalStrength(),
+            networkName: showsName ? wifiNetworkName : nil,
+            showsNetworkName: showsName
         )
+    }
+
+    private func resolvedSignalStrength() -> WiFiSignalStrength {
+        guard WiFiSignalStrengthCapability.isSupported else {
+            return .notApplicable
+        }
+
+        switch readSignalStrength() {
+        case .known(let percentage):
+            return .known(percentage: percentage)
+        case .unavailable:
+            return .notApplicable
+        }
+    }
+
+    private enum SignalReadResult: Equatable {
+        case known(percentage: Int)
+        case unavailable
+    }
+
+    private func readSignalStrength() -> SignalReadResult {
+        #if os(macOS) && canImport(CoreWLAN)
+        guard let interface = CWWiFiClient.shared().interface() else {
+            return .unavailable
+        }
+
+        let rssi = interface.rssiValue()
+        guard rssi != 0 else {
+            return .unavailable
+        }
+
+        return .known(percentage: WiFiSignalStrengthMapping.percentage(fromRSSI: rssi))
+        #else
+        return .unavailable
+        #endif
+    }
+
+    private func refreshNetworkNameIfNeeded() {
+        guard showWiFiNetworkName, wifiConnected else {
+            wifiNetworkName = nil
+            return
+        }
+
+        #if os(macOS) && canImport(CoreWLAN)
+        wifiNetworkName = readNetworkNameSynchronously()
+        #elseif canImport(NetworkExtension)
+        NEHotspotNetwork.fetchCurrent { [weak self] network in
+            guard let self else { return }
+            let sanitized = WiFiNetworkNameSanitizer.sanitized(network?.ssid)
+            self.monitorQueue.async {
+                guard self.showWiFiNetworkName, self.wifiConnected else { return }
+                guard self.wifiNetworkName != sanitized else { return }
+                self.wifiNetworkName = sanitized
+                DispatchQueue.main.async {
+                    self.publishSnapshot()
+                }
+            }
+        }
+        #endif
+    }
+
+    private func readNetworkNameSynchronously() -> String? {
+        #if os(macOS) && canImport(CoreWLAN)
+        return WiFiNetworkNameSanitizer.sanitized(CWWiFiClient.shared().interface()?.ssid())
+        #else
+        return nil
+        #endif
     }
 
     private func makeSpeakerState() -> ConnectivityIndicatorState {
@@ -113,7 +257,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
             return .unavailable(
                 title: "Speaker/Output",
                 subtitle: "Audio session unavailable",
-                symbolName: "hifispeaker.slash",
+                symbolName: "speaker.slash.fill",
                 reason: "Audio Session Error"
             )
         }
@@ -122,7 +266,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
             return .unavailable(
                 title: "Speaker/Output",
                 subtitle: "No route detected",
-                symbolName: "hifispeaker.slash",
+                symbolName: "speaker.slash.fill",
                 reason: "No Active Route"
             )
         }
@@ -139,14 +283,41 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         return .unavailable(
             title: "Speaker/Output",
             subtitle: "Output route unsupported",
-            symbolName: "hifispeaker.slash",
+            symbolName: "speaker.slash.fill",
             reason: "Unsupported"
         )
         #endif
     }
 
+    #if canImport(CoreBluetooth)
+    private func startBluetoothMonitoringIfNeeded() {
+        guard isBluetoothMonitoringEnabled, bluetoothManager == nil else { return }
+        bluetoothManager = CBCentralManager(delegate: self, queue: monitorQueue)
+    }
+
+    private func stopBluetoothMonitoring() {
+        bluetoothManager = nil
+        bluetoothValue = "Off"
+        bluetoothSubtitle = "Bluetooth is turned off"
+        bluetoothSymbol = "antenna.radiowaves.left.and.right.slash"
+        bluetoothAvailability = .available
+    }
+    #endif
+
     private func makeBluetoothState() -> ConnectivityIndicatorState {
-        ConnectivityIndicatorState(
+        #if canImport(CoreBluetooth)
+        if !isBluetoothMonitoringEnabled {
+            return ConnectivityIndicatorState(
+                title: "Bluetooth",
+                valueText: "Off",
+                subtitleText: "Enable in Settings to monitor Bluetooth",
+                symbolName: "antenna.radiowaves.left.and.right.slash",
+                availability: .available
+            )
+        }
+        #endif
+
+        return ConnectivityIndicatorState(
             title: "Bluetooth",
             valueText: bluetoothValue,
             subtitleText: bluetoothSubtitle,
@@ -196,12 +367,20 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         }
 
         let wifi = uiTestArgumentValue(after: "--ui-testing-wifi-status", default: "connected")
+        let wifiSignal = uiTestArgumentValue(after: "--ui-testing-wifi-signal", default: "72")
+        let wifiSSID = uiTestSSIDArgument()
+        let showWiFiName = processInfo.arguments.contains("--ui-testing-show-wifi-network-name")
         let speaker = uiTestArgumentValue(after: "--ui-testing-speaker-status", default: "speaker")
         let bluetooth = uiTestArgumentValue(after: "--ui-testing-bluetooth-status", default: "on")
         let ringer = uiTestArgumentValue(after: "--ui-testing-ringer-status", default: "unavailable")
 
         return ConnectivityState(
-            wifi: connectivityStateForWiFi(wifi),
+            wifi: wifiStateForUITest(
+                linkStatus: wifi,
+                signal: wifiSignal,
+                networkName: wifiSSID,
+                showsNetworkName: showWiFiName || wifiSSID != nil
+            ),
             speaker: connectivityStateForSpeaker(speaker),
             bluetooth: connectivityStateForBluetooth(bluetooth),
             ringer: connectivityStateForRinger(ringer)
@@ -219,31 +398,49 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         return processInfo.arguments[index + 1].lowercased()
     }
 
-    private func connectivityStateForWiFi(_ value: String) -> ConnectivityIndicatorState {
-        switch value {
+    private func uiTestSSIDArgument() -> String? {
+        guard
+            let index = processInfo.arguments.firstIndex(of: "--ui-testing-wifi-ssid"),
+            processInfo.arguments.indices.contains(index + 1)
+        else {
+            return nil
+        }
+
+        return WiFiNetworkNameSanitizer.sanitized(processInfo.arguments[index + 1])
+    }
+
+    private func wifiStateForUITest(
+        linkStatus: String,
+        signal: String,
+        networkName: String?,
+        showsNetworkName: Bool
+    ) -> WiFiIndicatorState {
+        switch linkStatus {
         case "connected":
-            return ConnectivityIndicatorState(
-                title: "Wi-Fi",
-                valueText: "Connected",
-                subtitleText: "Wi-Fi active",
-                symbolName: "wifi",
-                availability: .available
+            return .connected(
+                signal: wifiSignalForUITest(signal),
+                networkName: networkName,
+                showsNetworkName: showsNetworkName
             )
         case "disconnected":
-            return ConnectivityIndicatorState(
-                title: "Wi-Fi",
-                valueText: "Disconnected",
-                subtitleText: "No Wi-Fi link",
-                symbolName: "wifi.slash",
-                availability: .available
-            )
+            return .disconnected(showsNetworkName: showsNetworkName)
         default:
-            return .unavailable(
-                title: "Wi-Fi",
-                subtitle: "Wi-Fi status unavailable",
-                symbolName: "wifi.slash",
-                reason: "Unavailable"
-            )
+            return .unavailable
+        }
+    }
+
+    private func wifiSignalForUITest(_ value: String) -> WiFiSignalStrength {
+        switch value {
+        case "unavailable":
+            return .unavailable(reason: "Signal strength unavailable on this platform")
+        case "not-applicable", "n/a":
+            return .notApplicable
+        default:
+            if let percentage = Int(value) {
+                let clamped = Swift.min(100, Swift.max(0, percentage))
+                return .known(percentage: clamped)
+            }
+            return .known(percentage: 72)
         }
     }
 
@@ -277,7 +474,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
             return .unavailable(
                 title: "Speaker/Output",
                 subtitle: "Output route unavailable",
-                symbolName: "hifispeaker.slash",
+                symbolName: "speaker.slash.fill",
                 reason: "Unavailable"
             )
         }
@@ -298,7 +495,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
                 title: "Bluetooth",
                 valueText: "Off",
                 subtitleText: "Bluetooth is turned off",
-                symbolName: "bolt.horizontal.slash",
+                symbolName: "antenna.radiowaves.left.and.right.slash",
                 availability: .available
             )
         default:
@@ -352,7 +549,7 @@ extension SystemConnectivityProvider: CBCentralManagerDelegate {
         case .poweredOff:
             bluetoothValue = "Off"
             bluetoothSubtitle = "Bluetooth is turned off"
-            bluetoothSymbol = "bolt.horizontal.slash"
+            bluetoothSymbol = "antenna.radiowaves.left.and.right.slash"
             bluetoothAvailability = .available
         case .unauthorized:
             bluetoothValue = "--"

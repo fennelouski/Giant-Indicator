@@ -24,6 +24,7 @@ extension IndicatorUnavailablePresenting {
 }
 
 struct IndicatorUnavailableGlyph: View {
+    @Environment(\.dashboardPalette) private var palette
     let symbolName: String
     let metrics: TileMetrics
     var iconHeight: CGFloat?
@@ -31,7 +32,7 @@ struct IndicatorUnavailableGlyph: View {
     var body: some View {
         Image(systemName: symbolName)
             .font(.system(size: metrics.symbolFontSize, weight: .bold))
-            .foregroundStyle(.white.opacity(0.78))
+            .foregroundStyle(palette.mutedText)
             .symbolRenderingMode(.hierarchical)
             .frame(height: iconHeight ?? metrics.iconHeight)
             .padding(.horizontal, 8)
@@ -40,6 +41,7 @@ struct IndicatorUnavailableGlyph: View {
 }
 
 struct IndicatorUnavailableValueCluster: View {
+    @Environment(\.dashboardPalette) private var palette
     let reason: String
     let metrics: TileMetrics
     var valueFontSize: CGFloat?
@@ -53,12 +55,12 @@ struct IndicatorUnavailableValueCluster: View {
     var body: some View {
         Text(IndicatorFallbackPresentation.unknownValueText)
             .font(.system(size: resolvedValueFontSize, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(palette.foreground)
             .accessibilityIdentifier(valueAccessibilityIdentifier)
 
         Text(reason)
             .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.95))
+            .foregroundStyle(palette.titleText)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
             .multilineTextAlignment(.center)

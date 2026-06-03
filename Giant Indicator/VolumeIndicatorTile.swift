@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct VolumeIndicatorTile: View {
+    @Environment(\.dashboardPalette) private var palette
     let volumeState: VolumeState
     let metrics: TileMetrics
 
@@ -27,7 +28,7 @@ struct VolumeIndicatorTile: View {
             if volumeState.isDataAvailable {
                 Text(volumeState.percentageText)
                     .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(palette.foreground)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
                     .accessibilityIdentifier("volume-percentage-label")
@@ -42,7 +43,7 @@ struct VolumeIndicatorTile: View {
 
             Text("Volume")
                 .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.95))
+                .foregroundStyle(palette.titleText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }

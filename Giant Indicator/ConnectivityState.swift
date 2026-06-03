@@ -51,14 +51,14 @@ struct ConnectivityIndicatorState: Equatable, IndicatorUnavailablePresenting {
 }
 
 struct ConnectivityState: Equatable {
-    let wifi: ConnectivityIndicatorState
+    let wifi: WiFiIndicatorState
     let speaker: ConnectivityIndicatorState
     let bluetooth: ConnectivityIndicatorState
     let ringer: ConnectivityIndicatorState
 
     static let unavailable = ConnectivityState(
-        wifi: .unavailable(title: "Wi-Fi", subtitle: "Status unavailable", symbolName: "wifi.slash"),
-        speaker: .unavailable(title: "Speaker/Output", subtitle: "Output unavailable", symbolName: "hifispeaker.slash"),
+        wifi: .unavailable,
+        speaker: .unavailable(title: "Speaker/Output", subtitle: "Output unavailable", symbolName: "speaker.slash.fill"),
         bluetooth: .unavailable(title: "Bluetooth", subtitle: "Status unavailable", symbolName: "bolt.horizontal"),
         ringer: .unavailable(title: "Ringer/Silent", subtitle: "Status unavailable", symbolName: "bell.slash")
     )

@@ -19,13 +19,38 @@ final class WeatherViewModel: ObservableObject {
         self.locationProvider = locationProvider
     }
 
-    func refreshOnLaunch() async {
+    func showNotRequestedPlaceholder() {
+        if uiTestingDisplayState() != nil { return }
+        displayState = WeatherDisplayState(
+            snapshot: nil,
+            attribution: nil,
+            source: nil,
+            errorMessage: nil,
+            permissionState: .notRequested
+        )
+    }
+
+    func refresh(requestAuthorization: Bool) async {
         if let uiTestingState = uiTestingDisplayState() {
             displayState = uiTestingState
             return
         }
 
-        let resolved = await locationProvider.resolveWeatherLocation()
+        let resolved = await locationProvider.resolveWeatherLocation(
+            requestAuthorization: requestAuthorization
+        )
+
+        if resolved.permission == .notRequested {
+            displayState = WeatherDisplayState(
+                snapshot: nil,
+                attribution: nil,
+                source: nil,
+                errorMessage: nil,
+                permissionState: .notRequested
+            )
+            return
+        }
+
         guard let location = resolved.location else {
             displayState = WeatherDisplayState(
                 snapshot: nil,

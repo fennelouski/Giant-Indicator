@@ -8,30 +8,31 @@
 import SwiftUI
 
 struct EmptyIndicatorsView: View {
+    @Environment(\.dashboardPalette) private var palette
     let openSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "square.grid.2x2")
                 .font(.system(size: 60, weight: .bold))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(palette.mutedText)
 
             Text("No indicators enabled")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(palette.foreground)
                 .multilineTextAlignment(.center)
 
             Text("Open Settings to choose indicators.")
                 .font(.system(size: 20, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.78))
+                .foregroundStyle(palette.mutedText)
                 .multilineTextAlignment(.center)
 
             Button("Open Settings") {
                 openSettings()
             }
             .buttonStyle(.borderedProminent)
-            .tint(.white.opacity(0.2))
-            .foregroundStyle(.white)
+            .tint(palette.gearButtonFill)
+            .foregroundStyle(palette.foreground)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
