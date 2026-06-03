@@ -11,6 +11,7 @@ struct VolumeIndicatorTile: View {
     @Environment(\.dashboardPalette) private var palette
     let volumeState: VolumeState
     let metrics: TileMetrics
+    var showsKindLabel: Bool = true
 
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
@@ -41,15 +42,30 @@ struct VolumeIndicatorTile: View {
                 )
             }
 
-            Text("Volume")
-                .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(palette.titleText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if showsKindLabel {
+                Text("Volume")
+                    .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.titleText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("volume-kind-label")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(metrics.padding)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(volumeAccessibilityLabel)
         .accessibilityIdentifier("indicator-tile-volume")
         .dashboardTileContainer(cornerRadius: metrics.cornerRadius)
+    }
+
+    private var volumeAccessibilityLabel: String {
+        if volumeState.isDataAvailable {
+            return "Volume \(volumeState.percentageText)"
+        }
+        if volumeState.unavailableReasonText.isEmpty {
+            return "Volume unavailable"
+        }
+        return "Volume unavailable, \(volumeState.unavailableReasonText)"
     }
 }

@@ -11,6 +11,7 @@ struct BatteryIndicatorTile: View {
     @Environment(\.dashboardPalette) private var palette
     @ObservedObject var viewModel: BatteryViewModel
     let metrics: TileMetrics
+    var showsKindLabel: Bool = true
 
     private var batteryState: BatteryState { viewModel.state }
 
@@ -31,11 +32,14 @@ struct BatteryIndicatorTile: View {
                 )
             }
 
-            Text("Battery")
-                .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(palette.titleText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if showsKindLabel {
+                Text("Battery")
+                    .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.titleText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("battery-kind-label")
+            }
 
             if batteryState.isDataAvailable {
                 Text(batteryState.powerConnectionText)

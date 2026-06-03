@@ -21,15 +21,11 @@ final class Giant_IndicatorUITests: XCTestCase {
     private let weatherAttributionArgument = "--ui-testing-weather-attribution"
     private let connectivityOverrideArgument = "--ui-testing-connectivity-override"
     private let defaultDashboardTileIdentifiers = [
-        "indicator-tile-weather",
         "indicator-tile-battery",
-        "indicator-tile-volume",
-        "indicator-tile-wifi",
-        "indicator-tile-clock",
-        "indicator-tile-date"
+        "indicator-tile-chargingState"
     ]
 
-    private let defaultDashboardTileCount = 6
+    private let defaultDashboardTileCount = 2
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -196,6 +192,7 @@ final class Giant_IndicatorUITests: XCTestCase {
     func testWeatherTileShowsNotRequestedBeforeLocationConsent() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launch()
+        enableIndicators(["weather"], in: app)
 
         let weatherTile = app.otherElements["indicator-tile-weather"]
         XCTAssertTrue(weatherTile.waitForExistence(timeout: 2))
@@ -236,6 +233,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [weatherDeniedArgument]
         app.launch()
+        enableIndicators(["weather"], in: app)
 
         let weatherTile = app.otherElements["indicator-tile-weather"]
         XCTAssertTrue(weatherTile.waitForExistence(timeout: 2))
@@ -254,6 +252,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launchArguments += [weatherAttributionArgument]
         app.launch()
+        enableIndicators(["weather"], in: app)
 
         let weatherTile = app.otherElements["indicator-tile-weather"]
         XCTAssertTrue(weatherTile.waitForExistence(timeout: 2))
@@ -268,6 +267,11 @@ final class Giant_IndicatorUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
         assertDefaultDashboardTilesAreVisible(app)
+        XCTAssertFalse(app.otherElements["indicator-tile-weather"].exists)
+        XCTAssertFalse(app.otherElements["indicator-tile-volume"].exists)
+        XCTAssertFalse(app.otherElements["indicator-tile-wifi"].exists)
+        XCTAssertFalse(app.otherElements["indicator-tile-clock"].exists)
+        XCTAssertFalse(app.otherElements["indicator-tile-date"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-playback"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-nowPlaying"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-speaker"].exists)
@@ -360,7 +364,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         ]
         app.launch()
 
-        enableIndicators(["speaker", "ringer"], in: app)
+        enableIndicators(["wifi", "speaker", "ringer"], in: app)
 
         XCTAssertTrue(app.otherElements["indicator-tile-wifi"].waitForExistence(timeout: 2))
         #if os(macOS)
@@ -431,6 +435,7 @@ final class Giant_IndicatorUITests: XCTestCase {
             "--ui-testing-wifi-ssid", "HomeNetwork"
         ]
         app.launch()
+        enableIndicators(["wifi"], in: app)
 
         XCTAssertTrue(app.otherElements["indicator-tile-wifi"].waitForExistence(timeout: 2))
         XCTAssertEqual(app.staticTexts["wifi-value-label"].label, "HomeNetwork")

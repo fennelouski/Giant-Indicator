@@ -16,6 +16,7 @@ struct MasonryLayoutPlanTests {
     private static let allIndicatorPlaceholders: [IndicatorPlaceholder] = [
         IndicatorPlaceholder(kind: .weather, value: "72°", subtitle: "Sunny"),
         IndicatorPlaceholder(kind: .battery, value: "50%"),
+        IndicatorPlaceholder(kind: .chargingState, value: "On Battery"),
         IndicatorPlaceholder(kind: .volume, value: "30%"),
         IndicatorPlaceholder(kind: .playback, value: "Playing"),
         IndicatorPlaceholder(kind: .nowPlaying, value: "Track"),
@@ -29,6 +30,7 @@ struct MasonryLayoutPlanTests {
 
     private static let defaultFavoritePlaceholders: [IndicatorPlaceholder] = [
         IndicatorPlaceholder(kind: .battery, value: "50%"),
+        IndicatorPlaceholder(kind: .chargingState, value: "On Battery"),
         IndicatorPlaceholder(kind: .volume, value: "30%"),
         IndicatorPlaceholder(kind: .wifi, value: "Connected", subtitle: "Wi-Fi active"),
         IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
@@ -94,6 +96,51 @@ struct MasonryLayoutPlanTests {
         #expect(maxTileWidth(in: widePlan) > maxTileWidth(in: narrowPlan))
     }
 
+    @Test func progressiveKindLabelStrippingOrder() async throws {
+        let states = TileKindLabelVisibility.progressiveStrippingStates
+        #expect(states.count == TileKindLabelVisibility.strippingOrder.count + 1)
+        #expect(states.first?.showsKindLabel(for: .volume) == true)
+        #expect(states[1].showsKindLabel(for: .volume) == false)
+        #expect(states[1].showsKindLabel(for: .chargingState) == true)
+        #expect(states[1].showsKindLabel(for: .battery) == true)
+        #expect(states.last?.showsKindLabel(for: .battery) == false)
+    }
+
+    @Test func tightLayoutHidesMoreKindLabelsThanSpaciousLayout() async throws {
+        let spacious = MasonryLayoutPlan.build(
+            indicators: Self.allIndicatorPlaceholders,
+            in: CGSize(width: 393, height: 852)
+        )
+        let tight = MasonryLayoutPlan.build(
+            indicators: Self.allIndicatorPlaceholders,
+            in: CGSize(width: 393, height: 480)
+        )
+
+        #expect(spacious.fitsIn(size: CGSize(width: 393, height: 852)))
+        #expect(tight.fitsIn(size: CGSize(width: 393, height: 480)))
+        #expect(tight.satisfiesReadableTileMetrics)
+
+        let spaciousLabelCount = visibleKindLabelCount(in: spacious)
+        let tightLabelCount = visibleKindLabelCount(in: tight)
+
+        #expect(spaciousLabelCount == TileKindLabelVisibility.strippingOrder.count)
+        #expect(tightLabelCount < spaciousLabelCount)
+
+        let volumeItem = tight.columns.flatMap(\.items).first { $0.placeholder.kind == .volume }
+        #expect(volumeItem?.showsKindLabel == false)
+    }
+
+    @Test func spaciousLayoutShowsBatteryAndChargingStateKindLabels() async throws {
+        let size = CGSize(width: 393, height: 852)
+        let plan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: size)
+
+        let chargingItem = plan.columns.flatMap(\.items).first { $0.placeholder.kind == .chargingState }
+        let batteryItem = plan.columns.flatMap(\.items).first { $0.placeholder.kind == .battery }
+
+        #expect(chargingItem?.showsKindLabel == true)
+        #expect(batteryItem?.showsKindLabel == true)
+    }
+
     @Test func layoutSignatureChangesWhenColumnCountChanges() async throws {
         let narrow = MasonryLayoutPlan.build(
             indicators: Self.allIndicatorPlaceholders,
@@ -105,6 +152,12 @@ struct MasonryLayoutPlanTests {
         )
 
         #expect(narrow.layoutSignature != wide.layoutSignature)
+    }
+
+    private func visibleKindLabelCount(in plan: MasonryLayoutPlan) -> Int {
+        plan.columns.flatMap(\.items).filter { item in
+            item.showsKindLabel && TileKindLabelVisibility.strippingOrder.contains(item.placeholder.kind)
+        }.count
     }
 
     private func averageTileWidth(in plan: MasonryLayoutPlan) -> CGFloat {

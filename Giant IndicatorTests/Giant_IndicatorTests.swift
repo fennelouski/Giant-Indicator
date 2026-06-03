@@ -87,6 +87,29 @@ struct Giant_IndicatorTests {
         #expect(unplugged.powerConnectionText == "Unplugged")
     }
 
+    @Test func batteryStateDescribesChargingState() async throws {
+        let onBattery = BatteryState(percentage: 55, chargingState: .onBattery, availability: .available)
+        let charging = BatteryState(percentage: 55, chargingState: .charging, availability: .available)
+        let pluggedIdle = BatteryState(percentage: 100, chargingState: .pluggedNotCharging, availability: .available)
+
+        #expect(onBattery.chargingStateText == "On Battery")
+        #expect(charging.chargingStateText == "Charging")
+        #expect(pluggedIdle.chargingStateText == "Plugged In")
+        #expect(onBattery.chargingStateSymbolName == "battery.100percent")
+        #expect(charging.chargingStateSymbolName == "bolt.batteryblock.fill")
+        #expect(pluggedIdle.chargingStateSymbolName == "powerplug.fill")
+        #expect(!onBattery.isPluggedIn)
+        #expect(charging.isPluggedIn)
+        #expect(pluggedIdle.isPluggedIn)
+    }
+
+    @Test func chargingStateIndicatorIsAvailableInSettings() async throws {
+        #expect(IndicatorKind.chargingState.isVisibleInSettings)
+        #expect(IndicatorKind.chargingState.settingsGroup == .battery)
+        #expect(IndicatorKind.visibleInSettings(for: .battery).contains(.chargingState))
+        #expect(IndicatorKind.chargingState.defaultVisibility)
+    }
+
     @Test func weatherLocationProvider_mapsPermissionStates() async throws {
         let provider = WeatherLocationProvider()
         #expect(provider.permissionState(from: .notDetermined) == .notRequested)
@@ -279,6 +302,11 @@ struct Giant_IndicatorTests {
             #expect(kind.defaultVisibility)
         }
 
+        #expect(!IndicatorKind.weather.defaultVisibility)
+        #expect(!IndicatorKind.volume.defaultVisibility)
+        #expect(!IndicatorKind.wifi.defaultVisibility)
+        #expect(!IndicatorKind.clock.defaultVisibility)
+        #expect(!IndicatorKind.date.defaultVisibility)
         #expect(!IndicatorKind.playback.defaultVisibility)
         #expect(!IndicatorKind.nowPlaying.defaultVisibility)
         #expect(!IndicatorKind.speaker.defaultVisibility)

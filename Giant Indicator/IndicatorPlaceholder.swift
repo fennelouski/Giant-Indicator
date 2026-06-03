@@ -32,6 +32,24 @@ struct IndicatorPlaceholder: Identifiable {
         )
     }
 
+    static func fromBatteryChargingState(_ state: BatteryState) -> IndicatorPlaceholder {
+        guard state.isDataAvailable else {
+            return IndicatorPlaceholder(
+                kind: .chargingState,
+                value: IndicatorFallbackPresentation.unknownValueText,
+                subtitle: state.unavailableReasonText,
+                symbolOverride: state.unavailableSymbolName,
+                showsUnavailableFallback: true
+            )
+        }
+
+        return IndicatorPlaceholder(
+            kind: .chargingState,
+            value: state.chargingStateText,
+            symbolOverride: state.chargingStateSymbolName
+        )
+    }
+
     static func fromWiFiState(_ state: WiFiIndicatorState) -> IndicatorPlaceholder {
         IndicatorPlaceholder(
             kind: .wifi,

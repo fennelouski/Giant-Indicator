@@ -12,8 +12,21 @@ struct MasonryLayoutPlan {
         let placeholder: IndicatorPlaceholder
         let width: CGFloat
         let height: CGFloat
+        let showsKindLabel: Bool
 
         var id: IndicatorKind { placeholder.kind }
+
+        init(
+            placeholder: IndicatorPlaceholder,
+            width: CGFloat,
+            height: CGFloat,
+            showsKindLabel: Bool
+        ) {
+            self.placeholder = placeholder
+            self.width = width
+            self.height = height
+            self.showsKindLabel = showsKindLabel
+        }
     }
 
     struct Column {
@@ -47,7 +60,10 @@ struct MasonryLayoutPlan {
     var satisfiesReadableTileMetrics: Bool {
         columns.flatMap(\.items).allSatisfy { item in
             let metrics = TileMetrics(width: item.width, height: item.height)
-            return metrics.minimumContentHeight <= item.height + 0.5
+            return metrics.minimumContentHeight(
+                for: item.placeholder.kind,
+                showsKindLabel: item.showsKindLabel
+            ) <= item.height + 0.5
         }
     }
 
@@ -160,46 +176,67 @@ struct MasonryLayoutPlan {
             spacing: spacing
         )
 
-        var builtColumns: [Column] = []
-        var balancedHeights: [CGFloat] = []
+        for kindLabelVisibility in TileKindLabelVisibility.progressiveStrippingStates {
+            var builtColumns: [Column] = []
+            var balancedHeights: [CGFloat] = []
+            var layoutFailed = false
 
-        for column in columns {
-            var heights = column.map { preferredTileHeight(for: $0.kind) * preferredScale }
-            heights = heights.map { max($0, adaptiveMinimumHeight) }
+            for column in columns {
+                var heights = column.map { preferredTileHeight(for: $0.kind) * preferredScale }
+                heights = heights.map { max($0, adaptiveMinimumHeight) }
 
-            let contentFloors = heights.map {
-                stabilizedTileHeight(
-                    width: tileWidth,
-                    initial: $0,
-                    minimumHeight: adaptiveMinimumHeight
-                )
+                let contentFloors = zip(column, heights).map { placeholder, height in
+                    stabilizedTileHeight(
+                        width: tileWidth,
+                        initial: height,
+                        minimumHeight: adaptiveMinimumHeight,
+                        kind: placeholder.kind,
+                        kindLabelVisibility: kindLabelVisibility
+                    )
+                }
+                heights = zip(heights, contentFloors).map { max($0, $1) }
+
+                guard fitHeightsToColumn(
+                    &heights,
+                    contentFloors: contentFloors,
+                    availableHeight: availableHeight,
+                    spacing: spacing
+                ) else {
+                    layoutFailed = true
+                    break
+                }
+
+                let items = zip(column, heights).map { placeholder, height in
+                    return Item(
+                        placeholder: placeholder,
+                        width: tileWidth,
+                        height: height,
+                        showsKindLabel: kindLabelVisibility.showsKindLabel(for: placeholder.kind)
+                    )
+                }
+
+                guard itemsSatisfyReadableTileMetrics(items) else {
+                    layoutFailed = true
+                    break
+                }
+
+                builtColumns.append(Column(items: items))
+                balancedHeights.append(totalHeight(of: heights, spacing: spacing))
             }
-            heights = zip(heights, contentFloors).map { max($0, $1) }
 
-            guard fitHeightsToColumn(
-                &heights,
-                contentFloors: contentFloors,
-                availableHeight: availableHeight,
-                spacing: spacing
-            ) else {
-                return nil
-            }
+            guard !layoutFailed else { continue }
 
-            let items = zip(column, heights).map { placeholder, height in
-                Item(placeholder: placeholder, width: tileWidth, height: height)
-            }
-
-            builtColumns.append(Column(items: items))
-            balancedHeights.append(totalHeight(of: heights, spacing: spacing))
+            let readabilityScore = preferredScale * 10_000
+            let widthScore = min(tileWidth, 360) * 10
+            let balancePenalty = (balancedHeights.max() ?? 0) - (balancedHeights.min() ?? 0)
+            let columnCountBonus = columnCount > 1 ? CGFloat(columnCount) * 50 : 0
+            let multiColumnBonus: CGFloat = columnCount > 1 && tileWidth >= 200 ? 50_000 : 0
+            let score = readabilityScore + widthScore - balancePenalty + columnCountBonus
+                + multiColumnBonus + kindLabelVisibility.kindLabelScoreBonus
+            return LayoutCandidate(columns: builtColumns, score: score)
         }
 
-        let readabilityScore = preferredScale * 10_000
-        let widthScore = min(tileWidth, 360) * 10
-        let balancePenalty = (balancedHeights.max() ?? 0) - (balancedHeights.min() ?? 0)
-        let columnCountBonus = columnCount > 1 ? CGFloat(columnCount) * 50 : 0
-        let multiColumnBonus: CGFloat = columnCount > 1 && tileWidth >= 200 ? 50_000 : 0
-        let score = readabilityScore + widthScore - balancePenalty + columnCountBonus + multiColumnBonus
-        return LayoutCandidate(columns: builtColumns, score: score)
+        return nil
     }
 
     private static func fallbackCandidate(
@@ -227,29 +264,86 @@ struct MasonryLayoutPlan {
         let totalSpacing = spacing * CGFloat(max(count - 1, 0))
         let perItemHeight = max((availableHeight - totalSpacing) / CGFloat(count), 1)
         let tileWidth = max(availableWidth, 1)
-        let heights = indicators.map { _ in
+
+        for kindLabelVisibility in TileKindLabelVisibility.progressiveStrippingStates {
+            let heights = indicators.map { placeholder in
+                stabilizedTileHeight(
+                    width: tileWidth,
+                    initial: perItemHeight,
+                    minimumHeight: perItemHeight,
+                    kind: placeholder.kind,
+                    kindLabelVisibility: kindLabelVisibility
+                )
+            }
+
+            guard totalHeight(of: heights, spacing: spacing) <= availableHeight + 0.5 else {
+                continue
+            }
+
+            let items = zip(indicators, heights).map { placeholder, height in
+                Item(
+                    placeholder: placeholder,
+                    width: tileWidth,
+                    height: height,
+                    showsKindLabel: kindLabelVisibility.showsKindLabel(for: placeholder.kind)
+                )
+            }
+
+            guard itemsSatisfyReadableTileMetrics(items) else { continue }
+
+            return LayoutCandidate(
+                columns: [Column(items: items)],
+                score: kindLabelVisibility.kindLabelScoreBonus
+            )
+        }
+
+        let kindLabelVisibility = TileKindLabelVisibility.hidingBatteryAndVolume
+        let heights = indicators.map { placeholder in
             stabilizedTileHeight(
                 width: tileWidth,
                 initial: perItemHeight,
-                minimumHeight: perItemHeight
+                minimumHeight: perItemHeight,
+                kind: placeholder.kind,
+                kindLabelVisibility: kindLabelVisibility
             )
         }
         let column = Column(
             items: zip(indicators, heights).map { placeholder, height in
-                Item(placeholder: placeholder, width: tileWidth, height: height)
+                Item(
+                    placeholder: placeholder,
+                    width: tileWidth,
+                    height: height,
+                    showsKindLabel: false
+                )
             }
         )
         return LayoutCandidate(columns: [column], score: 0)
     }
 
+    private static func itemsSatisfyReadableTileMetrics(_ items: [Item]) -> Bool {
+        items.allSatisfy { item in
+            let metrics = TileMetrics(width: item.width, height: item.height)
+            return metrics.minimumContentHeight(
+                for: item.placeholder.kind,
+                showsKindLabel: item.showsKindLabel
+            ) <= item.height + 0.5
+        }
+    }
+
     private static func stabilizedTileHeight(
         width: CGFloat,
         initial: CGFloat,
-        minimumHeight: CGFloat
+        minimumHeight: CGFloat,
+        kind: IndicatorKind,
+        kindLabelVisibility: TileKindLabelVisibility
     ) -> CGFloat {
         var target = initial
         for _ in 0..<4 {
-            let required = TileMetrics(width: width, height: target).minimumContentHeight
+            let metrics = TileMetrics(width: width, height: target)
+            let required = metrics.minimumContentHeight(
+                for: kind,
+                kindLabelVisibility: kindLabelVisibility
+            )
             if required <= target + 0.5 {
                 break
             }
@@ -319,6 +413,8 @@ struct MasonryLayoutPlan {
             return 300
         case .battery:
             return 250
+        case .chargingState:
+            return 220
         case .volume:
             return 250
         case .playback:

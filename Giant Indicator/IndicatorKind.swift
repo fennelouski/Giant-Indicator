@@ -19,6 +19,7 @@ enum SettingsGroup: String, CaseIterable {
 enum IndicatorKind: String, CaseIterable, Identifiable {
     case weather
     case battery
+    case chargingState
     case volume
     case playback
     case nowPlaying
@@ -43,6 +44,8 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "Weather"
         case .battery:
             return "Battery"
+        case .chargingState:
+            return "Charging State"
         case .volume:
             return "Volume"
         case .playback:
@@ -70,6 +73,8 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "cloud.sun.fill"
         case .battery:
             return "battery.75"
+        case .chargingState:
+            return "bolt.batteryblock.fill"
         case .volume:
             return "speaker.wave.2.fill"
         case .playback:
@@ -101,9 +106,9 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Default dashboard favorites for fresh installs (readable without scrolling on phone).
+    /// Default dashboard indicators for fresh installs — giant battery plus charging state.
     static var defaultDashboardFavorites: Set<IndicatorKind> {
-        [.battery, .volume, .wifi, .clock, .date, .weather]
+        [.battery, .chargingState]
     }
 
     var defaultVisibility: Bool {
@@ -149,7 +154,7 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
 
     var settingsGroup: SettingsGroup {
         switch self {
-        case .battery:
+        case .battery, .chargingState:
             return .battery
         case .wifi:
             return .wifi

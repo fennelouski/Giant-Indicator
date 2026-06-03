@@ -68,18 +68,22 @@ struct SystemBatteryProvider: BatteryStateProviding {
             return nil
         }
 
-        let powerConnection: BatteryPowerConnection
-        if processInfo.arguments.contains("--ui-testing-battery-plugged-in") {
-            powerConnection = .pluggedIn
+        let chargingState: BatteryChargingState
+        if let chargingStateIndex = processInfo.arguments.firstIndex(of: "--ui-testing-battery-charging-state"),
+           processInfo.arguments.indices.contains(chargingStateIndex + 1)
+        {
+            chargingState = uiTestChargingState(from: processInfo.arguments[chargingStateIndex + 1])
+        } else if processInfo.arguments.contains("--ui-testing-battery-plugged-in") {
+            chargingState = .charging
         } else if processInfo.arguments.contains("--ui-testing-battery-unplugged") {
-            powerConnection = .unplugged
+            chargingState = .onBattery
         } else {
-            powerConnection = .unplugged
+            chargingState = .onBattery
         }
 
         return BatteryState(
             percentage: level,
-            powerConnection: powerConnection,
+            chargingState: chargingState,
             availability: .available
         )
     }
@@ -93,18 +97,31 @@ private func snapshotUIKitBatteryState(device: UIDevice) -> BatteryState {
     }
 
     let percentage = Int((level * 100).rounded())
-    let powerConnection = uiKitPowerConnection(from: device.batteryState)
-    return BatteryState(percentage: percentage, powerConnection: powerConnection, availability: .available)
+    let chargingState = uiKitChargingState(from: device.batteryState)
+    return BatteryState(percentage: percentage, chargingState: chargingState, availability: .available)
 }
 
-private func uiKitPowerConnection(from batteryState: UIDevice.BatteryState) -> BatteryPowerConnection {
+private func uiKitChargingState(from batteryState: UIDevice.BatteryState) -> BatteryChargingState {
     switch batteryState {
-    case .charging, .full:
-        return .pluggedIn
+    case .charging:
+        return .charging
+    case .full:
+        return .pluggedNotCharging
     case .unplugged, .unknown:
-        return .unplugged
+        return .onBattery
     @unknown default:
-        return .unplugged
+        return .onBattery
+    }
+}
+
+private func uiTestChargingState(from argument: String) -> BatteryChargingState {
+    switch argument {
+    case "charging":
+        return .charging
+    case "plugged-not-charging":
+        return .pluggedNotCharging
+    default:
+        return .onBattery
     }
 }
 #endif
@@ -134,22 +151,26 @@ private func snapshotMacBatteryState() -> BatteryState {
         }
 
         let percentage = Int((Double(current) / Double(max) * 100).rounded())
-        let powerConnection = macPowerConnection(from: description)
-        return BatteryState(percentage: percentage, powerConnection: powerConnection, availability: .available)
+        let chargingState = macChargingState(from: description)
+        return BatteryState(percentage: percentage, chargingState: chargingState, availability: .available)
     }
 
     return .unavailable
 }
 
-private func macPowerConnection(from description: [String: Any]) -> BatteryPowerConnection {
+private func macChargingState(from description: [String: Any]) -> BatteryChargingState {
     guard let powerSourceState = description[kIOPSPowerSourceStateKey as String] as? String else {
-        return .unplugged
+        return .onBattery
     }
 
-    if powerSourceState == kIOPSACPowerKey {
-        return .pluggedIn
+    guard powerSourceState == kIOPSACPowerKey else {
+        return .onBattery
     }
 
-    return .unplugged
+    if let isCharging = description[kIOPSIsChargingKey as String] as? Bool, isCharging {
+        return .charging
+    }
+
+    return .pluggedNotCharging
 }
 #endif

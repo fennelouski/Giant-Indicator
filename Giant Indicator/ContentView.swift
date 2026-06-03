@@ -25,6 +25,7 @@ struct ContentView: View {
     private var indicators: [IndicatorPlaceholder] {
         [
             IndicatorPlaceholder(kind: .battery, value: batteryViewModel.state.percentageText),
+            IndicatorPlaceholder.fromBatteryChargingState(batteryViewModel.state),
             IndicatorPlaceholder(kind: .volume, value: volumeViewModel.state.percentageText),
             IndicatorPlaceholder(kind: .playback, value: playbackViewModel.state.titleText),
             IndicatorPlaceholder(kind: .nowPlaying, value: nowPlayingViewModel.state.titleText),
@@ -79,8 +80,12 @@ struct ContentView: View {
                             VStack(spacing: layout.spacing) {
                                 ForEach(column.items) { item in
                                     let metrics = TileMetrics(width: item.width, height: item.height)
-                                    tileView(for: item.placeholder, metrics: metrics)
-                                        .frame(height: item.height)
+                                    tileView(
+                                        for: item.placeholder,
+                                        metrics: metrics,
+                                        showsKindLabel: item.showsKindLabel
+                                    )
+                                    .frame(height: item.height)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .top)
@@ -274,11 +279,29 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func tileView(for placeholder: IndicatorPlaceholder, metrics: TileMetrics) -> some View {
+    private func tileView(
+        for placeholder: IndicatorPlaceholder,
+        metrics: TileMetrics,
+        showsKindLabel: Bool
+    ) -> some View {
         if placeholder.kind == .battery {
-            BatteryIndicatorTile(viewModel: batteryViewModel, metrics: metrics)
+            BatteryIndicatorTile(
+                viewModel: batteryViewModel,
+                metrics: metrics,
+                showsKindLabel: showsKindLabel
+            )
+        } else if placeholder.kind == .chargingState {
+            ChargingIndicatorTile(
+                viewModel: batteryViewModel,
+                metrics: metrics,
+                showsKindLabel: showsKindLabel
+            )
         } else if placeholder.kind == .volume {
-            VolumeIndicatorTile(volumeState: volumeViewModel.state, metrics: metrics)
+            VolumeIndicatorTile(
+                volumeState: volumeViewModel.state,
+                metrics: metrics,
+                showsKindLabel: showsKindLabel
+            )
         } else if placeholder.kind == .playback {
             PlaybackIndicatorTile(playbackState: playbackViewModel.state, metrics: metrics)
         } else if placeholder.kind == .nowPlaying {

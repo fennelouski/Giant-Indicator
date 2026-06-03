@@ -24,19 +24,58 @@ struct TileMetrics {
 
     /// Approximate vertical space for the current tile metrics (icon + primary [+ subtitle]).
     var minimumContentHeight: CGFloat {
-        let verticalPadding = padding * 2
-        let primaryText = max(
-            valueFontSize,
-            max(clockTimeFontSize, max(dateTextFontSize, batteryPercentageFontSize))
-        )
-        let glyphHeight = min(iconHeight, primaryText * 0.55)
-        let compactStack = verticalPadding + contentSpacing + glyphHeight + primaryText * 1.05
+        minimumContentHeight(for: .weather, kindLabelVisibility: .allVisible)
+    }
 
-        guard height >= Self.minimumReadableTileHeight * 0.95 else {
-            return compactStack
+    func minimumContentHeight(
+        for kind: IndicatorKind,
+        kindLabelVisibility: TileKindLabelVisibility
+    ) -> CGFloat {
+        minimumContentHeight(
+            for: kind,
+            showsKindLabel: kindLabelVisibility.showsKindLabel(for: kind)
+        )
+    }
+
+    func minimumContentHeight(for kind: IndicatorKind, showsKindLabel: Bool) -> CGFloat {
+        var stack = baseMinimumContentStack(for: kind)
+
+        if showsKindLabel && TileKindLabelVisibility.strippingOrder.contains(kind) {
+            stack += contentSpacing + titleFontSize * 1.05
         }
 
-        return compactStack + contentSpacing + subtitleFontSize * 0.9
+        guard height >= Self.minimumReadableTileHeight * 0.95 else {
+            return stack
+        }
+
+        return stack + contentSpacing + subtitleFontSize * 0.9
+    }
+
+    private func baseMinimumContentStack(for kind: IndicatorKind) -> CGFloat {
+        let verticalPadding = padding * 2
+        let primaryText: CGFloat
+        let glyphHeight: CGFloat
+
+        switch kind {
+        case .battery:
+            primaryText = batteryPercentageFontSize
+            glyphHeight = min(batteryIconHeight, primaryText * 0.55)
+        case .clock:
+            primaryText = clockTimeFontSize
+            glyphHeight = min(iconHeight, primaryText * 0.55)
+        case .date:
+            primaryText = dateTextFontSize
+            glyphHeight = min(iconHeight, primaryText * 0.55)
+        default:
+            let genericPrimary = max(
+                valueFontSize,
+                max(clockTimeFontSize, max(dateTextFontSize, batteryPercentageFontSize))
+            )
+            primaryText = genericPrimary
+            glyphHeight = min(iconHeight, genericPrimary * 0.55)
+        }
+
+        return verticalPadding + contentSpacing + glyphHeight + primaryText * 1.05
     }
 
     var contentSpacing: CGFloat {

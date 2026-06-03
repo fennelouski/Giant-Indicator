@@ -10,23 +10,43 @@ enum BatteryPowerConnection: Equatable {
     case unplugged
 }
 
+enum BatteryChargingState: Equatable {
+    case onBattery
+    case charging
+    case pluggedNotCharging
+}
+
 struct BatteryState: Equatable, IndicatorUnavailablePresenting {
     let percentage: Int
+    let chargingState: BatteryChargingState
     let powerConnection: BatteryPowerConnection
     let availability: BatteryAvailability
 
     init(
         percentage: Int,
-        powerConnection: BatteryPowerConnection = .unplugged,
+        chargingState: BatteryChargingState = .onBattery,
         availability: BatteryAvailability
     ) {
         self.percentage = percentage
-        self.powerConnection = powerConnection
+        self.chargingState = chargingState
+        self.powerConnection = Self.powerConnection(from: chargingState)
         self.availability = availability
     }
 
+    init(
+        percentage: Int,
+        powerConnection: BatteryPowerConnection,
+        availability: BatteryAvailability
+    ) {
+        self.init(
+            percentage: percentage,
+            chargingState: Self.chargingState(from: powerConnection),
+            availability: availability
+        )
+    }
+
     var isPluggedIn: Bool {
-        powerConnection == .pluggedIn
+        chargingState != .onBattery
     }
 
     var powerConnectionText: String {
@@ -35,6 +55,46 @@ struct BatteryState: Equatable, IndicatorUnavailablePresenting {
             return "Plugged In"
         case .unplugged:
             return "Unplugged"
+        }
+    }
+
+    var chargingStateText: String {
+        switch chargingState {
+        case .onBattery:
+            return "On Battery"
+        case .charging:
+            return "Charging"
+        case .pluggedNotCharging:
+            return "Plugged In"
+        }
+    }
+
+    var chargingStateSymbolName: String {
+        switch chargingState {
+        case .onBattery:
+            return "battery.100percent"
+        case .charging:
+            return "bolt.batteryblock.fill"
+        case .pluggedNotCharging:
+            return "powerplug.fill"
+        }
+    }
+
+    static func powerConnection(from chargingState: BatteryChargingState) -> BatteryPowerConnection {
+        switch chargingState {
+        case .onBattery:
+            return .unplugged
+        case .charging, .pluggedNotCharging:
+            return .pluggedIn
+        }
+    }
+
+    private static func chargingState(from powerConnection: BatteryPowerConnection) -> BatteryChargingState {
+        switch powerConnection {
+        case .pluggedIn:
+            return .pluggedNotCharging
+        case .unplugged:
+            return .onBattery
         }
     }
 
