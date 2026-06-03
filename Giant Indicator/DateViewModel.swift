@@ -13,8 +13,8 @@ final class DateViewModel: ObservableObject {
     private let provider: DateStateProviding
     private var cancellables = Set<AnyCancellable>()
 
-    init(provider: DateStateProviding = SystemDateProvider()) {
-        self.provider = provider
+    init(provider: DateStateProviding? = nil) {
+        self.provider = provider ?? SystemDateProvider()
         observe()
     }
 

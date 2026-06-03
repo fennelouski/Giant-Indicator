@@ -15,11 +15,11 @@ final class ClockViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init(
-        provider: ClockStateProviding = SystemClockProvider(),
-        showsSeconds: Bool = DisplayPreferences.showClockSeconds
+        provider: ClockStateProviding? = nil,
+        showsSeconds: Bool? = nil
     ) {
-        self.provider = provider
-        self.showsSeconds = showsSeconds
+        self.provider = provider ?? SystemClockProvider()
+        self.showsSeconds = showsSeconds ?? DisplayPreferences.showClockSeconds
         observe()
     }
 

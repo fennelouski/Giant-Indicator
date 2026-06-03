@@ -9,14 +9,14 @@ final class WeatherViewModel: ObservableObject {
     private let locationProvider: WeatherLocationProvider
 
     init(
-        repository: WeatherRepository = WeatherRepository(
+        repository: WeatherRepository? = nil,
+        locationProvider: WeatherLocationProvider? = nil
+    ) {
+        self.repository = repository ?? WeatherRepository(
             service: LiveWeatherServiceClient(),
             cacheStore: WeatherCacheStore()
-        ),
-        locationProvider: WeatherLocationProvider = WeatherLocationProvider()
-    ) {
-        self.repository = repository
-        self.locationProvider = locationProvider
+        )
+        self.locationProvider = locationProvider ?? WeatherLocationProvider()
     }
 
     func showNotRequestedPlaceholder() {

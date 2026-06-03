@@ -8,8 +8,8 @@ final class BatteryViewModel: ObservableObject {
     private let provider: BatteryStateProviding
     private var cancellables = Set<AnyCancellable>()
 
-    init(provider: BatteryStateProviding = SystemBatteryProvider()) {
-        self.provider = provider
+    init(provider: BatteryStateProviding? = nil) {
+        self.provider = provider ?? SystemBatteryProvider()
         observe()
     }
 

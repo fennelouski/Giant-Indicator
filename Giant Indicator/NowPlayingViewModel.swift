@@ -8,8 +8,8 @@ final class NowPlayingViewModel: ObservableObject {
     private let provider: NowPlayingStateProviding
     private var cancellables = Set<AnyCancellable>()
 
-    init(provider: NowPlayingStateProviding = SystemNowPlayingProvider()) {
-        self.provider = provider
+    init(provider: NowPlayingStateProviding? = nil) {
+        self.provider = provider ?? SystemNowPlayingProvider()
         observe()
     }
 

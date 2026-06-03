@@ -116,6 +116,8 @@ private func snapshotPlaybackState() -> PlaybackState {
         case .stopped:
             // Keep going: some sources report stopped while still publishing metadata.
             break
+        case .unknown:
+            break
         @unknown default:
             break
         }

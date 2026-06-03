@@ -8,8 +8,8 @@ final class VolumeViewModel: ObservableObject {
     private let provider: VolumeStateProviding
     private var cancellables = Set<AnyCancellable>()
 
-    init(provider: VolumeStateProviding = SystemVolumeProvider()) {
-        self.provider = provider
+    init(provider: VolumeStateProviding? = nil) {
+        self.provider = provider ?? SystemVolumeProvider()
         observe()
     }
 

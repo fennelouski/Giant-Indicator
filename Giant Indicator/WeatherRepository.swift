@@ -34,14 +34,15 @@ actor WeatherRepository {
 
     func loadWeather(location: CLLocation) async -> WeatherDisplayState {
         let currentDate = now()
-        let cached = cacheStore.load()
+        let cached = await MainActor.run { cacheStore.load() }
 
-        if
-            let cached,
-            !WeatherCachePolicy.shouldRefresh(lastFetchAt: cached.lastFetchAt, now: currentDate)
-        {
+        let cacheIsFresh = await MainActor.run {
+            WeatherCachePolicy.shouldRefresh(lastFetchAt: cached?.lastFetchAt, now: currentDate)
+        }
+
+        if let cached, !cacheIsFresh {
             return WeatherDisplayState(
-                snapshot: hydratedSnapshot(cached.snapshot, at: currentDate),
+                snapshot: await hydratedSnapshot(cached.snapshot, at: currentDate),
                 attribution: cached.attribution,
                 source: .cached,
                 errorMessage: nil
@@ -53,7 +54,9 @@ actor WeatherRepository {
             let attribution = try await service.attribution()
             let snapshot = makeSnapshot(from: weather, fetchedAt: currentDate)
             let attributionData = makeAttribution(from: attribution)
-            cacheStore.save(snapshot: snapshot, attribution: attributionData, lastFetchAt: currentDate)
+            await MainActor.run {
+                cacheStore.save(snapshot: snapshot, attribution: attributionData, lastFetchAt: currentDate)
+            }
 
             return WeatherDisplayState(
                 snapshot: snapshot,
@@ -64,7 +67,7 @@ actor WeatherRepository {
         } catch {
             if let cached {
                 return WeatherDisplayState(
-                    snapshot: hydratedSnapshot(cached.snapshot, at: currentDate),
+                    snapshot: await hydratedSnapshot(cached.snapshot, at: currentDate),
                     attribution: cached.attribution,
                     source: .cached,
                     errorMessage: "Using cached weather."
@@ -80,8 +83,10 @@ actor WeatherRepository {
         }
     }
 
-    private func hydratedSnapshot(_ snapshot: WeatherSnapshot, at date: Date) -> WeatherSnapshot {
-        guard let nearest = WeatherCachePolicy.nearestHourlyPoint(from: snapshot.hourly, to: date) else {
+    private func hydratedSnapshot(_ snapshot: WeatherSnapshot, at date: Date) async -> WeatherSnapshot {
+        guard let nearest = await MainActor.run(body: {
+            WeatherCachePolicy.nearestHourlyPoint(from: snapshot.hourly, to: date)
+        }) else {
             return snapshot
         }
 

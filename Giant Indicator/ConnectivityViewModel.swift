@@ -8,10 +8,10 @@ final class ConnectivityViewModel: ObservableObject {
     private let provider: ConnectivityProviding
     private var cancellables = Set<AnyCancellable>()
 
-    init(provider: ConnectivityProviding = SystemConnectivityProvider()) {
-        self.provider = provider
+    init(provider: ConnectivityProviding? = nil) {
+        self.provider = provider ?? SystemConnectivityProvider()
         observe()
-        provider.updateShowWiFiNetworkName(DisplayPreferences.showWiFiNetworkName)
+        self.provider.updateShowWiFiNetworkName(DisplayPreferences.showWiFiNetworkName)
     }
 
     func updateShowWiFiNetworkName(_ enabled: Bool) {
