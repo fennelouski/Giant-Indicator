@@ -45,7 +45,7 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
         case .battery:
             return "Battery"
         case .chargingState:
-            return "Charging State"
+            return "Power"
         case .volume:
             return "Volume"
         case .playback:

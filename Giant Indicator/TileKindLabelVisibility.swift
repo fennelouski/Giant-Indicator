@@ -9,7 +9,7 @@ import Foundation
 struct TileKindLabelVisibility: Equatable {
     private let hiddenKinds: Set<IndicatorKind>
 
-    static let strippingOrder: [IndicatorKind] = [.volume, .chargingState, .battery]
+    static let strippingOrder: [IndicatorKind] = [.volume, .chargingState]
 
     static let allVisible = TileKindLabelVisibility(hiddenKinds: [])
 

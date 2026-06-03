@@ -13,12 +13,19 @@ struct ChargingIndicatorTile: View {
 
     private var batteryState: BatteryState { viewModel.state }
 
+    private var accentColor: Color {
+        BatteryAppearance.accentColor(
+            for: batteryState.chargingState,
+            percentage: batteryState.percentage
+        )
+    }
+
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
             if batteryState.isDataAvailable {
                 Image(systemName: batteryState.chargingStateSymbolName)
                     .font(.system(size: metrics.symbolFontSize, weight: .bold))
-                    .foregroundStyle(palette.foreground)
+                    .foregroundStyle(accentColor)
                     .accessibilityIdentifier("charging-state-symbol")
             } else {
                 IndicatorUnavailableGlyph(
@@ -29,11 +36,10 @@ struct ChargingIndicatorTile: View {
 
             if batteryState.isDataAvailable {
                 Text(batteryState.chargingStateText)
-                    .font(.system(size: metrics.valueFontSize, weight: .heavy, design: .rounded))
-                    .foregroundStyle(palette.foreground)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .font(.system(size: metrics.titleFontSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(accentColor)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
                     .accessibilityIdentifier("charging-state-value-label")
             } else {
                 IndicatorUnavailableValueCluster(

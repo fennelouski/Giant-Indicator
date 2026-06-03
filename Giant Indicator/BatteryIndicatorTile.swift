@@ -15,12 +15,35 @@ struct BatteryIndicatorTile: View {
 
     private var batteryState: BatteryState { viewModel.state }
 
+    private var levelColor: Color {
+        BatteryAppearance.levelColor(for: batteryState.percentage)
+    }
+
+    private var fillColor: Color {
+        BatteryAppearance.fillColor(
+            percentage: batteryState.percentage,
+            chargingState: batteryState.chargingState
+        )
+    }
+
+    private var accentColor: Color {
+        BatteryAppearance.accentColor(
+            for: batteryState.chargingState,
+            percentage: batteryState.percentage
+        )
+    }
+
     var body: some View {
         VStack(spacing: metrics.contentSpacing) {
             percentageSection
 
             if batteryState.isDataAvailable {
-                BatteryIcon(level: batteryState.normalizedLevel, isPluggedIn: batteryState.isPluggedIn)
+                BatteryIcon(
+                    level: batteryState.normalizedLevel,
+                    fillColor: fillColor,
+                    accentColor: accentColor,
+                    isPluggedIn: batteryState.isPluggedIn
+                )
                     .frame(height: metrics.batteryIconHeight)
                     .padding(.horizontal, 8)
                     .accessibilityHidden(true)
@@ -32,22 +55,13 @@ struct BatteryIndicatorTile: View {
                 )
             }
 
-            if showsKindLabel {
-                Text("Battery")
-                    .font(.system(size: metrics.titleFontSize, weight: .semibold, design: .rounded))
-                    .foregroundStyle(palette.titleText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .accessibilityIdentifier("battery-kind-label")
-            }
-
             if batteryState.isDataAvailable {
-                Text(batteryState.powerConnectionText)
-                    .font(.system(size: metrics.subtitleFontSize, weight: .semibold, design: .rounded))
-                    .foregroundStyle(palette.subtitleText)
+                Text(batteryState.chargingStateText)
+                    .font(.system(size: metrics.titleFontSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(accentColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .accessibilityIdentifier("battery-power-connection-label")
+                    .minimumScaleFactor(0.5)
+                    .accessibilityIdentifier("battery-status-label")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,7 +77,7 @@ struct BatteryIndicatorTile: View {
         if batteryState.isDataAvailable {
             Text(batteryState.percentageText)
                 .font(.system(size: metrics.batteryPercentageFontSize, weight: .heavy, design: .rounded))
-                .foregroundStyle(palette.foreground)
+                .foregroundStyle(levelColor)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
                 .accessibilityIdentifier("battery-percentage-label")
@@ -80,7 +94,7 @@ struct BatteryIndicatorTile: View {
 
     private var accessibilityLabel: String {
         if batteryState.isDataAvailable {
-            return "Battery \(batteryState.percentageText), \(batteryState.powerConnectionText)"
+            return "Battery \(batteryState.percentageText), \(batteryState.chargingStateText)"
         }
         if batteryState.unavailableReasonText.isEmpty {
             return "Battery unavailable"

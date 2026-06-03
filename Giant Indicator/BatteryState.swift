@@ -65,7 +65,7 @@ struct BatteryState: Equatable, IndicatorUnavailablePresenting {
         case .charging:
             return "Charging"
         case .pluggedNotCharging:
-            return "Plugged In"
+            return "On Power"
         }
     }
 

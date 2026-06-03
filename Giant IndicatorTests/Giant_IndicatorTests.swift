@@ -94,7 +94,7 @@ struct Giant_IndicatorTests {
 
         #expect(onBattery.chargingStateText == "On Battery")
         #expect(charging.chargingStateText == "Charging")
-        #expect(pluggedIdle.chargingStateText == "Plugged In")
+        #expect(pluggedIdle.chargingStateText == "On Power")
         #expect(onBattery.chargingStateSymbolName == "battery.100percent")
         #expect(charging.chargingStateSymbolName == "bolt.batteryblock.fill")
         #expect(pluggedIdle.chargingStateSymbolName == "powerplug.fill")

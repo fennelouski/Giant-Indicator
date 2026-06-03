@@ -102,8 +102,7 @@ struct MasonryLayoutPlanTests {
         #expect(states.first?.showsKindLabel(for: .volume) == true)
         #expect(states[1].showsKindLabel(for: .volume) == false)
         #expect(states[1].showsKindLabel(for: .chargingState) == true)
-        #expect(states[1].showsKindLabel(for: .battery) == true)
-        #expect(states.last?.showsKindLabel(for: .battery) == false)
+        #expect(states.last?.showsKindLabel(for: .chargingState) == false)
     }
 
     @Test func tightLayoutHidesMoreKindLabelsThanSpaciousLayout() async throws {
@@ -130,15 +129,13 @@ struct MasonryLayoutPlanTests {
         #expect(volumeItem?.showsKindLabel == false)
     }
 
-    @Test func spaciousLayoutShowsBatteryAndChargingStateKindLabels() async throws {
+    @Test func spaciousLayoutShowsChargingStateKindLabel() async throws {
         let size = CGSize(width: 393, height: 852)
         let plan = MasonryLayoutPlan.build(indicators: Self.defaultFavoritePlaceholders, in: size)
 
         let chargingItem = plan.columns.flatMap(\.items).first { $0.placeholder.kind == .chargingState }
-        let batteryItem = plan.columns.flatMap(\.items).first { $0.placeholder.kind == .battery }
 
         #expect(chargingItem?.showsKindLabel == true)
-        #expect(batteryItem?.showsKindLabel == true)
     }
 
     @Test func layoutSignatureChangesWhenColumnCountChanges() async throws {

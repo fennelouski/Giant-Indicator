@@ -36,14 +36,6 @@ struct TileMetricsTests {
         #expect(TileMetrics.minimumReadableTileHeight == 130)
     }
 
-    @Test func batteryKindLabelIncreasesMinimumContentHeight() async throws {
-        let metrics = TileMetrics(width: 200, height: 180)
-        let withLabel = metrics.minimumContentHeight(for: .battery, showsKindLabel: true)
-        let withoutLabel = metrics.minimumContentHeight(for: .battery, showsKindLabel: false)
-
-        #expect(withLabel > withoutLabel)
-    }
-
     @Test func volumeKindLabelIncreasesMinimumContentHeight() async throws {
         let metrics = TileMetrics(width: 200, height: 180)
         let withLabel = metrics.minimumContentHeight(for: .volume, showsKindLabel: true)

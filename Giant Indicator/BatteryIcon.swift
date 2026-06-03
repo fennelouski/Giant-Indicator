@@ -10,6 +10,8 @@ import SwiftUI
 struct BatteryIcon: View {
     @Environment(\.dashboardPalette) private var palette
     let level: CGFloat
+    let fillColor: Color
+    let accentColor: Color
     var isPluggedIn: Bool = false
 
     var body: some View {
@@ -23,10 +25,10 @@ struct BatteryIcon: View {
 
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(palette.foreground, lineWidth: strokeWidth)
+                    .stroke(palette.foreground.opacity(0.55), lineWidth: strokeWidth)
                     .overlay(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(palette.foreground)
+                            .fill(fillColor)
                             .frame(width: contentWidth * clampedLevel)
                             .padding(contentPadding)
                             .accessibilityHidden(true)
@@ -34,15 +36,15 @@ struct BatteryIcon: View {
                     .frame(width: shellWidth)
 
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(palette.foreground)
+                    .fill(palette.foreground.opacity(0.55))
                     .frame(width: capWidth, height: max(18, proxy.size.height * 0.42))
             }
             .overlay {
                 if isPluggedIn {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: max(20, proxy.size.height * 0.42), weight: .bold))
-                        .foregroundStyle(palette.background)
-                        .shadow(color: palette.foreground.opacity(0.35), radius: 1, y: 1)
+                        .foregroundStyle(accentColor)
+                        .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
                         .accessibilityHidden(true)
                 }
             }

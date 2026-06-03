@@ -122,9 +122,9 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += [batteryLevelArgument, "72", batteryPluggedInArgument]
         app.launch()
 
-        let powerLabel = app.staticTexts["battery-power-connection-label"]
-        XCTAssertTrue(powerLabel.waitForExistence(timeout: 2))
-        XCTAssertEqual(powerLabel.label, "Plugged In")
+        let statusLabel = app.staticTexts["battery-status-label"]
+        XCTAssertTrue(statusLabel.waitForExistence(timeout: 2))
+        XCTAssertEqual(statusLabel.label, "Charging")
     }
 
     @MainActor
@@ -133,9 +133,9 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += [batteryLevelArgument, "72", batteryUnpluggedArgument]
         app.launch()
 
-        let powerLabel = app.staticTexts["battery-power-connection-label"]
-        XCTAssertTrue(powerLabel.waitForExistence(timeout: 2))
-        XCTAssertEqual(powerLabel.label, "Unplugged")
+        let statusLabel = app.staticTexts["battery-status-label"]
+        XCTAssertTrue(statusLabel.waitForExistence(timeout: 2))
+        XCTAssertEqual(statusLabel.label, "On Battery")
     }
 
     @MainActor
