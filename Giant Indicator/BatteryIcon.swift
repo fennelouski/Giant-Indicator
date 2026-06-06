@@ -13,6 +13,10 @@ struct BatteryIcon: View {
     let fillColor: Color
     let accentColor: Color
     var isPluggedIn: Bool = false
+    var animatesLevelChanges: Bool = false
+    var chargingPulse: Bool = false
+
+    @State private var pulsePhase = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -28,10 +32,11 @@ struct BatteryIcon: View {
                     .stroke(palette.foreground.opacity(0.55), lineWidth: strokeWidth)
                     .overlay(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(fillColor)
+                            .fill(displayFillColor)
                             .frame(width: contentWidth * clampedLevel)
                             .padding(contentPadding)
                             .accessibilityHidden(true)
+                            .animation(levelAnimation, value: level)
                     }
                     .frame(width: shellWidth)
 
@@ -48,6 +53,33 @@ struct BatteryIcon: View {
                         .accessibilityHidden(true)
                 }
             }
+        }
+        .scaleEffect(chargingPulseActive ? 1.02 : 1)
+        .opacity(chargingPulseActive ? (pulsePhase ? 1 : 0.88) : 1)
+        .onAppear { updatePulseAnimation() }
+        .onChange(of: chargingPulse) { _, _ in updatePulseAnimation() }
+        .onChange(of: isPluggedIn) { _, _ in updatePulseAnimation() }
+    }
+
+    private var displayFillColor: Color {
+        fillColor
+    }
+
+    private var levelAnimation: Animation? {
+        animatesLevelChanges ? .spring(response: 0.45, dampingFraction: 0.82) : nil
+    }
+
+    private var chargingPulseActive: Bool {
+        chargingPulse && isPluggedIn
+    }
+
+    private func updatePulseAnimation() {
+        guard chargingPulseActive else {
+            pulsePhase = false
+            return
+        }
+        withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+            pulsePhase = true
         }
     }
 }

@@ -130,6 +130,24 @@ struct TileMetrics {
         clamp(compactDimension * 0.12, min: boundedMin(18, 0.1), max: min(30, height * 0.16))
     }
 
+    /// Horizontal space available to the clock time label inside the tile.
+    var clockTimeAvailableWidth: CGFloat {
+        max(width - (padding * 2), 0)
+    }
+
+    /// Whether the clock time fits without shrinking below the previous minimum scale (0.4).
+    func clockTimeFitsAtReadableScale(
+        timeText: String = ClockFormatting.maximumLayoutTimeText,
+        minimumScale: CGFloat = 0.4
+    ) -> Bool {
+        let fitted = ClockTypography.fittedFontSize(
+            text: timeText,
+            maxFontSize: clockTimeFontSize,
+            availableWidth: clockTimeAvailableWidth
+        )
+        return fitted >= (clockTimeFontSize * minimumScale) - 0.5
+    }
+
     private func boundedMin(_ preferredMinimum: CGFloat, _ heightFraction: CGFloat) -> CGFloat {
         let scaledPreferred = preferredMinimum * sizeScale
         return min(scaledPreferred, max(4, height * heightFraction))

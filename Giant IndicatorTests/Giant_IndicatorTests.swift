@@ -258,6 +258,66 @@ struct Giant_IndicatorTests {
         #expect(DisplayPreferences.batteryReflectiveBackground)
     }
 
+    @Test func batteryTileDisplayStyle_fitThresholds() async throws {
+        let spacious = TileMetrics(width: 320, height: 280)
+        let narrow = TileMetrics(width: 160, height: 280)
+        let short = TileMetrics(width: 320, height: 100)
+
+        #expect(BatteryTileDisplayStyle.standard.fits(in: spacious))
+        #expect(BatteryTileDisplayStyle.horizontal.fits(in: spacious))
+        #expect(!BatteryTileDisplayStyle.horizontal.fits(in: narrow))
+        #expect(BatteryTileDisplayStyle.compact.fits(in: short))
+        #expect(!BatteryTileDisplayStyle.standard.fits(in: short))
+        #expect(BatteryTileDisplayStyle.iconFocus.fits(in: spacious))
+        #expect(!BatteryTileDisplayStyle.iconFocus.fits(in: short))
+    }
+
+    @Test func batteryTileDisplayStyle_cyclesEligibleStylesOnly() async throws {
+        let narrowTall = TileMetrics(width: 160, height: 280)
+        let eligible = BatteryTileDisplayStyle.eligibleStyles(for: narrowTall)
+        #expect(!eligible.contains(.horizontal))
+
+        let first = eligible[0]
+        let second = BatteryTileDisplayStyle.next(after: first, in: narrowTall)
+        #expect(second != first || eligible.count == 1)
+        let wrapped = BatteryTileDisplayStyle.next(after: eligible.last!, in: narrowTall)
+        #expect(wrapped == eligible[0])
+    }
+
+    @Test func batteryTileDisplayStyle_resolvesFallbackWithoutChangingPreference() async throws {
+        let short = TileMetrics(width: 320, height: 100)
+        let resolved = BatteryTileDisplayStyle.resolvedStyle(preferred: .standard, in: short)
+        #expect(resolved == .compact)
+    }
+
+    @Test func batteryState_percentageSymbolNameBucketsLevel() async throws {
+        #expect(BatteryState(percentage: 0, availability: .available).percentageSymbolName == "battery.0percent")
+        #expect(BatteryState(percentage: 10, availability: .available).percentageSymbolName == "battery.0percent")
+        #expect(BatteryState(percentage: 25, availability: .available).percentageSymbolName == "battery.25percent")
+        #expect(BatteryState(percentage: 55, availability: .available).percentageSymbolName == "battery.50percent")
+        #expect(BatteryState(percentage: 80, availability: .available).percentageSymbolName == "battery.75percent")
+        #expect(BatteryState(percentage: 100, availability: .available).percentageSymbolName == "battery.100percent")
+    }
+
+    @Test func displayPreferences_batteryTileDisplayStyleDefaultsAndPersists() async throws {
+        let key = "display.batteryTileDisplayStyle"
+        let defaults = UserDefaults.standard
+        let prior = defaults.object(forKey: key)
+        defer {
+            if let prior {
+                defaults.set(prior, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+
+        defaults.removeObject(forKey: key)
+        #expect(DisplayPreferences.batteryTileDisplayStyle == .standard)
+
+        DisplayPreferences.batteryTileDisplayStyle = .compact
+        #expect(DisplayPreferences.batteryTileDisplayStyle == .compact)
+    }
+
     @Test func batteryDrivenScreenBrightness_appliesSquaredFormulaWithFloor() async throws {
         #expect(BatteryDrivenScreenBrightness.screenBrightness(forPercentage: 20) == 0.10)
         #expect(BatteryDrivenScreenBrightness.screenBrightness(forPercentage: 40) == 0.16)
@@ -607,6 +667,35 @@ struct Giant_IndicatorTests {
 
         #expect(!text.isEmpty)
         #expect(text.filter(\.isNumber).count >= 3)
+    }
+
+    @Test func clockTypography_shrinksFontToFitNarrowWidthWithoutTruncating() async throws {
+        let maxFontSize: CGFloat = 80
+        let narrowWidth: CGFloat = 120
+        let text = ClockFormatting.maximumLayoutTimeText
+
+        let fitted = ClockTypography.fittedFontSize(
+            text: text,
+            maxFontSize: maxFontSize,
+            availableWidth: narrowWidth
+        )
+
+        #expect(fitted < maxFontSize)
+        #expect(ClockTypography.textWidth(text, fontSize: fitted) <= narrowWidth + 0.5)
+    }
+
+    @Test func clockTypography_usesMaxFontWhenWidthAllows() async throws {
+        let maxFontSize: CGFloat = 64
+        let text = "12:30"
+        let requiredWidth = ClockTypography.textWidth(text, fontSize: maxFontSize)
+
+        let fitted = ClockTypography.fittedFontSize(
+            text: text,
+            maxFontSize: maxFontSize,
+            availableWidth: requiredWidth + 20
+        )
+
+        #expect(fitted == maxFontSize)
     }
 
     @Test func clockFormatting_includesSecondsWhenRequested() async throws {

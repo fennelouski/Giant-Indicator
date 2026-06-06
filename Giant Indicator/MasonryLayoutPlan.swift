@@ -58,13 +58,7 @@ struct MasonryLayoutPlan {
     }
 
     var satisfiesReadableTileMetrics: Bool {
-        columns.flatMap(\.items).allSatisfy { item in
-            let metrics = TileMetrics(width: item.width, height: item.height)
-            return metrics.minimumContentHeight(
-                for: item.placeholder.kind,
-                showsKindLabel: item.showsKindLabel
-            ) <= item.height + 0.5
-        }
+        columns.flatMap(\.items).allSatisfy(Self.itemSatisfiesReadableTileMetrics)
     }
 
     /// Maximum indicators that can fit at readable tile height without scrolling.
@@ -74,29 +68,51 @@ struct MasonryLayoutPlan {
         return max(Int((availableHeight + spacing) / (tileHeight + spacing)), 1)
     }
 
-    static func build(indicators: [IndicatorPlaceholder], in size: CGSize) -> MasonryLayoutPlan {
+    static func build(
+        indicators: [IndicatorPlaceholder],
+        in size: CGSize
+    ) -> MasonryLayoutPlan {
         let outerPadding: CGFloat = 20
         let spacing: CGFloat = 16
         let availableWidth = max(size.width - (outerPadding * 2), 1)
         let availableHeight = max(size.height - (outerPadding * 2), 1)
-        let maxColumnsByWidth = max(Int((availableWidth + spacing) / (160 + spacing)), 1)
+        let indicatorAvailableWidth = availableWidth
+        let isLandscape = availableWidth > availableHeight
+
+        let maxColumnsByWidth = max(
+            Int((indicatorAvailableWidth + spacing) / (160 + spacing)),
+            1
+        )
         var maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
         while maxColumns > 1 {
-            let tileWidth = (availableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns)
+            let tileWidth = (indicatorAvailableWidth - (spacing * CGFloat(maxColumns - 1))) / CGFloat(maxColumns)
             if tileWidth >= 220 {
                 break
             }
             maxColumns -= 1
         }
 
+        let prefersSideBySideBatteryAndCharging = isLandscape
+            && indicators.count >= 2
+            && indicators[0].kind == .battery
+            && indicators[1].kind == .chargingState
+
+        let columnCountsToEvaluate: [Int] = {
+            if prefersSideBySideBatteryAndCharging, maxColumns >= 2 {
+                return Array(2...maxColumns)
+            }
+            return Array(1...maxColumns)
+        }()
+
         var bestCandidate: LayoutCandidate?
-        for columnCount in 1...maxColumns {
+        for columnCount in columnCountsToEvaluate {
             guard let candidate = makeCandidate(
                 indicators: indicators,
                 columnCount: columnCount,
-                availableWidth: availableWidth,
+                availableWidth: indicatorAvailableWidth,
                 availableHeight: availableHeight,
-                spacing: spacing
+                spacing: spacing,
+                isLandscape: isLandscape
             ) else {
                 continue
             }
@@ -110,7 +126,7 @@ struct MasonryLayoutPlan {
             }
         }
 
-        let resolved: LayoutCandidate
+        var resolved: LayoutCandidate
         if let bestCandidate {
             resolved = bestCandidate
         } else {
@@ -119,9 +135,10 @@ struct MasonryLayoutPlan {
                 if let candidate = makeCandidate(
                     indicators: indicators,
                     columnCount: columnCount,
-                    availableWidth: availableWidth,
+                    availableWidth: indicatorAvailableWidth,
                     availableHeight: availableHeight,
-                    spacing: spacing
+                    spacing: spacing,
+                    isLandscape: isLandscape
                 ) {
                     retried = candidate
                     break
@@ -129,11 +146,44 @@ struct MasonryLayoutPlan {
             }
             resolved = retried ?? fallbackCandidate(
                 indicators: indicators,
-                availableWidth: availableWidth,
+                availableWidth: indicatorAvailableWidth,
                 availableHeight: availableHeight,
-                spacing: spacing
+                spacing: spacing,
+                isLandscape: isLandscape
             )
         }
+
+        if let manualLandscape = manualTwoColumnBatteryChargingLandscapeLayout(
+            indicators: indicators,
+            availableWidth: indicatorAvailableWidth,
+            availableHeight: availableHeight,
+            spacing: spacing,
+            isLandscape: isLandscape
+        ),
+            indicators.count <= 3,
+            batteryAndChargingShareColumn(in: resolved.columns) || resolved.columns.count == 1
+        {
+            resolved = manualLandscape
+        } else if let forcedLandscape = forcedLandscapeBatteryChargingClockCandidate(
+            indicators: indicators,
+            availableWidth: indicatorAvailableWidth,
+            availableHeight: availableHeight,
+            spacing: spacing,
+            isLandscape: isLandscape
+        ) {
+            resolved = forcedLandscape
+        } else if let pairedLandscape = preferredBatteryChargingLandscapeCandidate(
+            indicators: indicators,
+            current: resolved,
+            maxColumns: maxColumns,
+            availableWidth: indicatorAvailableWidth,
+            availableHeight: availableHeight,
+            spacing: spacing,
+            isLandscape: isLandscape
+        ) {
+            resolved = pairedLandscape
+        }
+
         return MasonryLayoutPlan(columns: resolved.columns, spacing: spacing, outerPadding: outerPadding)
     }
 
@@ -142,20 +192,202 @@ struct MasonryLayoutPlan {
         let score: CGFloat
     }
 
-    private static func makeCandidate(
+    private static func manualTwoColumnBatteryChargingLandscapeLayout(
         indicators: [IndicatorPlaceholder],
-        columnCount: Int,
         availableWidth: CGFloat,
         availableHeight: CGFloat,
-        spacing: CGFloat
+        spacing: CGFloat,
+        isLandscape: Bool
     ) -> LayoutCandidate? {
-        guard columnCount > 0 else { return nil }
+        guard isLandscape,
+              indicators.count >= 2,
+              indicators[0].kind == .battery,
+              indicators[1].kind == .chargingState
+        else {
+            return nil
+        }
 
-        let tileWidth = (availableWidth - (spacing * CGFloat(columnCount - 1))) / CGFloat(columnCount)
+        let tileWidth = (availableWidth - spacing) / 2
         guard tileWidth >= 140 else { return nil }
 
-        var columnHeights = Array(repeating: CGFloat(0), count: columnCount)
+        let leftPlaceholders = [indicators[0]]
+        let rightPlaceholders = Array(indicators.dropFirst())
+        let rightBudget = perTileHeightBudget(
+            maxItemsInColumn: rightPlaceholders.count,
+            availableHeight: availableHeight,
+            spacing: spacing
+        )
+
+        let leftItem = Item(
+            placeholder: indicators[0],
+            width: tileWidth,
+            height: availableHeight,
+            showsKindLabel: false
+        )
+
+        var rightHeights = rightPlaceholders.map { _ in rightBudget }
+        if totalHeight(of: rightHeights, spacing: spacing) > availableHeight + 0.5 {
+            let overflow = totalHeight(of: rightHeights, spacing: spacing) - availableHeight
+            let shrinkable = rightHeights.reduce(0) { $0 + max($1 - TileMetrics.minimumReadableTileHeight, 0) }
+            if shrinkable >= overflow {
+                for index in rightHeights.indices {
+                    let floor = TileMetrics.minimumReadableTileHeight
+                    let room = max(rightHeights[index] - floor, 0)
+                    guard room > 0, shrinkable > 0 else { continue }
+                    rightHeights[index] = max(floor, rightHeights[index] - overflow * (room / shrinkable))
+                }
+            }
+        }
+
+        let rightItems = zip(rightPlaceholders, rightHeights).map { placeholder, height in
+            Item(
+                placeholder: placeholder,
+                width: tileWidth,
+                height: height,
+                showsKindLabel: false
+            )
+        }
+
+        return LayoutCandidate(
+            columns: [
+                Column(items: [leftItem]),
+                Column(items: rightItems)
+            ],
+            score: 0
+        )
+    }
+
+    private static func forcedLandscapeBatteryChargingClockCandidate(
+        indicators: [IndicatorPlaceholder],
+        availableWidth: CGFloat,
+        availableHeight: CGFloat,
+        spacing: CGFloat,
+        isLandscape: Bool
+    ) -> LayoutCandidate? {
+        guard isLandscape,
+              indicators.count == 3,
+              indicators[0].kind == .battery,
+              indicators[1].kind == .chargingState,
+              indicators[2].kind == .clock
+        else {
+            return nil
+        }
+
+        for columnCount in [2, 3] {
+            guard let candidate = makeCandidate(
+                indicators: indicators,
+                columnCount: columnCount,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight,
+                spacing: spacing,
+                isLandscape: isLandscape
+            ),
+                !batteryAndChargingShareColumn(in: candidate.columns)
+            else {
+                continue
+            }
+            return candidate
+        }
+
+        return nil
+    }
+
+    private static func preferredBatteryChargingLandscapeCandidate(
+        indicators: [IndicatorPlaceholder],
+        current: LayoutCandidate,
+        maxColumns: Int,
+        availableWidth: CGFloat,
+        availableHeight: CGFloat,
+        spacing: CGFloat,
+        isLandscape: Bool
+    ) -> LayoutCandidate? {
+        guard isLandscape,
+              indicators.count >= 2,
+              indicators[0].kind == .battery,
+              indicators[1].kind == .chargingState,
+              batteryAndChargingShareColumn(in: current.columns)
+        else {
+            return nil
+        }
+
+        for columnCount in stride(from: min(maxColumns, indicators.count), through: 2, by: -1) {
+            guard let candidate = makeCandidate(
+                indicators: indicators,
+                columnCount: columnCount,
+                availableWidth: availableWidth,
+                availableHeight: availableHeight,
+                spacing: spacing,
+                isLandscape: isLandscape
+            ),
+                !batteryAndChargingShareColumn(in: candidate.columns)
+            else {
+                continue
+            }
+            return candidate
+        }
+
+        return nil
+    }
+
+    private static func batteryAndChargingShareColumn(in columns: [Column]) -> Bool {
+        let batteryColumn = columnIndex(for: .battery, in: columns)
+        let chargingColumn = columnIndex(for: .chargingState, in: columns)
+        guard let batteryColumn, let chargingColumn else { return false }
+        return batteryColumn == chargingColumn
+    }
+
+    private static func columnIndex(for kind: IndicatorKind, in columns: [Column]) -> Int? {
+        columns.enumerated().first { _, column in
+            column.items.contains { $0.placeholder.kind == kind }
+        }?.offset
+    }
+
+    private static func distributeIndicators(
+        _ indicators: [IndicatorPlaceholder],
+        columnCount: Int,
+        spacing: CGFloat,
+        isLandscape: Bool
+    ) -> [[IndicatorPlaceholder]] {
         var columns = Array(repeating: [IndicatorPlaceholder](), count: columnCount)
+
+        if isLandscape {
+            if columnCount >= 2,
+               indicators.count >= 2,
+               indicators[0].kind == .battery,
+               indicators[1].kind == .chargingState
+            {
+                columns[0].append(indicators[0])
+                columns[1].append(indicators[1])
+                for indicator in indicators.dropFirst(2) {
+                    columns[0].append(indicator)
+                }
+                return columns
+            }
+
+            for (index, indicator) in indicators.enumerated() {
+                columns[index % columnCount].append(indicator)
+            }
+            return columns
+        }
+
+        distributeRemainingIndicators(indicators, into: &columns, spacing: spacing)
+        return columns
+    }
+
+    private static func distributeRemainingIndicators(
+        _ indicators: [IndicatorPlaceholder],
+        into columns: inout [[IndicatorPlaceholder]],
+        spacing: CGFloat
+    ) {
+        guard !columns.isEmpty else { return }
+
+        var columnHeights = columns.map { column in
+            column.enumerated().reduce(CGFloat(0)) { partial, pair in
+                let height = preferredTileHeight(for: pair.element.kind)
+                let spacingBefore = pair.offset > 0 ? spacing : 0
+                return partial + spacingBefore + height
+            }
+        }
 
         for indicator in indicators {
             let target = columnHeights.enumerated().min(by: { $0.element < $1.element })?.offset ?? 0
@@ -166,10 +398,38 @@ struct MasonryLayoutPlan {
             columnHeights[target] += baseHeight
             columns[target].append(indicator)
         }
+    }
 
+    private static func makeCandidate(
+        indicators: [IndicatorPlaceholder],
+        columnCount: Int,
+        availableWidth: CGFloat,
+        availableHeight: CGFloat,
+        spacing: CGFloat,
+        isLandscape: Bool
+    ) -> LayoutCandidate? {
+        guard columnCount > 0 else { return nil }
+
+        let tileWidth = (availableWidth - (spacing * CGFloat(columnCount - 1))) / CGFloat(columnCount)
+        guard tileWidth >= 140 else { return nil }
+
+        let indicatorColumns = distributeIndicators(
+            indicators,
+            columnCount: columnCount,
+            spacing: spacing,
+            isLandscape: isLandscape
+        )
+
+        var columnHeights = indicatorColumns.map { column in
+            column.enumerated().reduce(CGFloat(0)) { partial, pair in
+                let height = preferredTileHeight(for: pair.element.kind)
+                let spacingBefore = pair.offset > 0 ? spacing : 0
+                return partial + spacingBefore + height
+            }
+        }
         let maxColumnHeight = columnHeights.max() ?? 1
         let preferredScale = min(max(availableHeight / maxColumnHeight, 0), 1.0)
-        let maxItemsInAnyColumn = columns.map(\.count).max() ?? 1
+        let maxItemsInAnyColumn = indicatorColumns.map(\.count).max() ?? 1
         let adaptiveMinimumHeight = adaptiveMinimumTileHeight(
             maxItemsInColumn: maxItemsInAnyColumn,
             availableHeight: availableHeight,
@@ -181,7 +441,7 @@ struct MasonryLayoutPlan {
             var balancedHeights: [CGFloat] = []
             var layoutFailed = false
 
-            for column in columns {
+            for column in indicatorColumns {
                 var heights = column.map { preferredTileHeight(for: $0.kind) * preferredScale }
                 heights = heights.map { max($0, adaptiveMinimumHeight) }
 
@@ -207,7 +467,7 @@ struct MasonryLayoutPlan {
                 }
 
                 let items = zip(column, heights).map { placeholder, height in
-                    return Item(
+                    Item(
                         placeholder: placeholder,
                         width: tileWidth,
                         height: height,
@@ -231,8 +491,16 @@ struct MasonryLayoutPlan {
             let balancePenalty = (balancedHeights.max() ?? 0) - (balancedHeights.min() ?? 0)
             let columnCountBonus = columnCount > 1 ? CGFloat(columnCount) * 50 : 0
             let multiColumnBonus: CGFloat = columnCount > 1 && tileWidth >= 200 ? 50_000 : 0
+            let landscapeFullRowBonus: CGFloat = {
+                guard isLandscape, columnCount > 1 else { return 0 }
+                let targetColumns = min(indicators.count, columnCount)
+                return columnCount >= targetColumns ? 5_000 : 0
+            }()
+            let landscapeSingleColumnPenalty: CGFloat =
+                isLandscape && columnCount == 1 && indicators.count >= 2 ? -100_000 : 0
             let score = readabilityScore + widthScore - balancePenalty + columnCountBonus
-                + multiColumnBonus + kindLabelVisibility.kindLabelScoreBonus
+                + multiColumnBonus + landscapeFullRowBonus + landscapeSingleColumnPenalty
+                + kindLabelVisibility.kindLabelScoreBonus
             return LayoutCandidate(columns: builtColumns, score: score)
         }
 
@@ -243,7 +511,8 @@ struct MasonryLayoutPlan {
         indicators: [IndicatorPlaceholder],
         availableWidth: CGFloat,
         availableHeight: CGFloat,
-        spacing: CGFloat
+        spacing: CGFloat,
+        isLandscape: Bool
     ) -> LayoutCandidate {
         let maxColumnsByWidth = max(Int((availableWidth + spacing) / (140 + spacing)), 1)
         let maxColumns = min(maxColumnsByWidth, max(indicators.count, 1))
@@ -254,7 +523,8 @@ struct MasonryLayoutPlan {
                 columnCount: columnCount,
                 availableWidth: availableWidth,
                 availableHeight: availableHeight,
-                spacing: spacing
+                spacing: spacing,
+                isLandscape: isLandscape
             ) {
                 return candidate
             }
@@ -307,27 +577,35 @@ struct MasonryLayoutPlan {
                 kindLabelVisibility: kindLabelVisibility
             )
         }
-        let column = Column(
-            items: zip(indicators, heights).map { placeholder, height in
-                Item(
-                    placeholder: placeholder,
-                    width: tileWidth,
-                    height: height,
-                    showsKindLabel: false
-                )
-            }
-        )
-        return LayoutCandidate(columns: [column], score: 0)
+        let items = zip(indicators, heights).map { placeholder, height in
+            Item(
+                placeholder: placeholder,
+                width: tileWidth,
+                height: height,
+                showsKindLabel: false
+            )
+        }
+        return LayoutCandidate(columns: [Column(items: items)], score: 0)
     }
 
     private static func itemsSatisfyReadableTileMetrics(_ items: [Item]) -> Bool {
-        items.allSatisfy { item in
-            let metrics = TileMetrics(width: item.width, height: item.height)
-            return metrics.minimumContentHeight(
-                for: item.placeholder.kind,
-                showsKindLabel: item.showsKindLabel
-            ) <= item.height + 0.5
+        items.allSatisfy(itemSatisfiesReadableTileMetrics)
+    }
+
+    private static func itemSatisfiesReadableTileMetrics(_ item: Item) -> Bool {
+        let metrics = TileMetrics(width: item.width, height: item.height)
+        guard metrics.minimumContentHeight(
+            for: item.placeholder.kind,
+            showsKindLabel: item.showsKindLabel
+        ) <= item.height + 0.5 else {
+            return false
         }
+
+        if item.placeholder.kind == .clock {
+            return metrics.clockTimeFitsAtReadableScale()
+        }
+
+        return true
     }
 
     private static func stabilizedTileHeight(

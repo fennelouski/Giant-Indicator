@@ -80,6 +80,27 @@ struct BatteryState: Equatable, IndicatorUnavailablePresenting {
         }
     }
 
+    /// Nearest SF Symbol battery bucket for the current percentage (0, 25, 50, 75, 100).
+    var percentageSymbolName: String {
+        let clamped = percentage.clamped(to: 0...100)
+        let bucket: Int
+        switch clamped {
+        case 0:
+            bucket = 0
+        case 1...12:
+            bucket = 0
+        case 13...37:
+            bucket = 25
+        case 38...62:
+            bucket = 50
+        case 63...87:
+            bucket = 75
+        default:
+            bucket = 100
+        }
+        return "battery.\(bucket)percent"
+    }
+
     static func powerConnection(from chargingState: BatteryChargingState) -> BatteryPowerConnection {
         switch chargingState {
         case .onBattery:

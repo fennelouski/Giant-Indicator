@@ -44,6 +44,16 @@ struct TileMetricsTests {
         #expect(withLabel > withoutLabel)
     }
 
+    @Test func narrowClockTileFailsReadableScaleCheck() async throws {
+        let metrics = TileMetrics(width: 80, height: 200)
+        #expect(!metrics.clockTimeFitsAtReadableScale())
+    }
+
+    @Test func wideClockTilePassesReadableScaleCheck() async throws {
+        let metrics = TileMetrics(width: 320, height: 200)
+        #expect(metrics.clockTimeFitsAtReadableScale())
+    }
+
     @Test func chargingStateKindLabelIncreasesMinimumContentHeight() async throws {
         let metrics = TileMetrics(width: 200, height: 180)
         let withLabel = metrics.minimumContentHeight(for: .chargingState, showsKindLabel: true)

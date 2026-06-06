@@ -16,6 +16,7 @@ enum DisplayPreferences {
     private static let showWiFiNetworkNameKey = "display.showWiFiNetworkName"
     private static let showStatusBarKey = "display.showStatusBar"
     private static let showClockSecondsKey = "display.showClockSeconds"
+    private static let batteryTileDisplayStyleKey = "display.batteryTileDisplayStyle"
 
     /// Defaults to enabled: the dashboard is meant to stay visible across the room (PR-14).
     static var keepScreenOn: Bool {
@@ -98,6 +99,22 @@ enum DisplayPreferences {
         }
     }
 
+    /// Defaults to standard; tap battery percentage on the dashboard to cycle styles.
+    static var batteryTileDisplayStyle: BatteryTileDisplayStyle {
+        get {
+            guard
+                let raw = defaults.string(forKey: batteryTileDisplayStyleKey),
+                let style = BatteryTileDisplayStyle(rawValue: raw)
+            else {
+                return .standard
+            }
+            return style
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: batteryTileDisplayStyleKey)
+        }
+    }
+
     /// Defaults to off; when enabled, shows the system status bar on supported platforms (PR-23).
     static var showStatusBar: Bool {
         get {
@@ -119,5 +136,6 @@ enum DisplayPreferences {
         defaults.removeObject(forKey: showWiFiNetworkNameKey)
         defaults.removeObject(forKey: showStatusBarKey)
         defaults.removeObject(forKey: showClockSecondsKey)
+        defaults.removeObject(forKey: batteryTileDisplayStyleKey)
     }
 }

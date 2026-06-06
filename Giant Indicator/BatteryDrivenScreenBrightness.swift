@@ -48,6 +48,44 @@ enum ScreenBrightnessControl {
     }
 }
 
+#if canImport(UIKit) && !os(macOS)
+/// Resolves the display's `UIScreen` from the hosting view hierarchy (iOS 26+).
+private struct ScreenContextReader: UIViewRepresentable {
+    var onScreenChange: (UIScreen?) -> Void
+
+    final class ReaderView: UIView {
+        var onScreenChange: ((UIScreen?) -> Void)?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            reportScreen()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            reportScreen()
+        }
+
+        fileprivate func reportScreen() {
+            onScreenChange?(window?.windowScene?.screen)
+        }
+    }
+
+    func makeUIView(context: Context) -> ReaderView {
+        let view = ReaderView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        view.onScreenChange = onScreenChange
+        return view
+    }
+
+    func updateUIView(_ uiView: ReaderView, context: Context) {
+        uiView.onScreenChange = onScreenChange
+        uiView.reportScreen()
+    }
+}
+#endif
+
 struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
     let isEnabled: Bool
     let batteryPercentage: Int
@@ -55,11 +93,23 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
 
     @Environment(\.scenePhase) private var scenePhase
     #if canImport(UIKit) && !os(macOS)
+    @State private var activeScreen: UIScreen?
     @State private var brightnessBeforeControl: CGFloat?
     #endif
 
     func body(content: Content) -> some View {
         content
+            .background {
+                #if canImport(UIKit) && !os(macOS)
+                ScreenContextReader { screen in
+                    if let screen {
+                        activeScreen = screen
+                        updateBrightnessControl()
+                    }
+                }
+                .frame(width: 0, height: 0)
+                #endif
+            }
             .onAppear { updateBrightnessControl() }
             .onDisappear { stopBrightnessControl() }
             .onChange(of: isEnabled) { _, _ in updateBrightnessControl() }
@@ -82,21 +132,22 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
 
     private func applyBatteryDrivenBrightness() {
         #if canImport(UIKit) && !os(macOS)
+        guard let activeScreen else { return }
         let percentage = isDataAvailable ? batteryPercentage : 0
         let target = CGFloat(
             BatteryDrivenScreenBrightness.screenBrightness(forPercentage: percentage)
         )
         if brightnessBeforeControl == nil {
-            brightnessBeforeControl = UIScreen.main.brightness
+            brightnessBeforeControl = activeScreen.brightness
         }
-        UIScreen.main.brightness = target
+        activeScreen.brightness = target
         #endif
     }
 
     private func stopBrightnessControl() {
         #if canImport(UIKit) && !os(macOS)
-        guard let brightnessBeforeControl else { return }
-        UIScreen.main.brightness = brightnessBeforeControl
+        guard let activeScreen, let brightnessBeforeControl else { return }
+        activeScreen.brightness = brightnessBeforeControl
         self.brightnessBeforeControl = nil
         #endif
     }

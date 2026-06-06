@@ -26,6 +26,9 @@ struct ClockState: Equatable {
 }
 
 enum ClockFormatting {
+    /// Conservative sample for layout/readability checks (12-hour clock with seconds and AM/PM).
+    static let maximumLayoutTimeText = "12:59:59 PM"
+
     static func timeText(
         from date: Date,
         showsSeconds: Bool,
