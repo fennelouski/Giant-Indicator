@@ -41,22 +41,42 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsHintToastRateLimitedOnBackgroundTap() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [weatherDeniedArgument]
+        app.launch()
+
+        assertDefaultDashboardTilesAreVisible(app)
+
+        let background = app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5))
+        let toast = app.otherElements["settings-hint-toast"]
+
+        background.tap()
+        XCTAssertTrue(toast.waitForExistence(timeout: 2))
+
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertFalse(toast.exists)
+
+        background.tap()
+        XCTAssertFalse(toast.waitForExistence(timeout: 1))
+
+        Thread.sleep(forTimeInterval: 7)
+        background.tap()
+        XCTAssertTrue(toast.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testOpenAndCloseSettings() throws {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launch()
 
-        let openSettingsButton = app.buttons["open-settings-button"]
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-
-        openSettingsButton.tap()
+        openSettings(in: app)
 
         let settingsView = app.otherElements["settings-view"]
-        XCTAssertTrue(settingsView.waitForExistence(timeout: 2))
-
         app.buttons["Done"].tap()
 
         XCTAssertFalse(settingsView.waitForExistence(timeout: 1))
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
+        openSettings(in: app)
     }
 
     @MainActor
@@ -64,9 +84,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launch()
 
-        let openSettingsButton = app.buttons["open-settings-button"]
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-        openSettingsButton.tap()
+        openSettings(in: app)
 
         let batteryToggle = app.switches["indicator-toggle-battery"]
         XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
@@ -84,8 +102,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments = []
         app.launch()
 
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-        openSettingsButton.tap()
+        openSettings(in: app)
 
         XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
         scrollIntoView(batteryToggle, in: app)
@@ -114,6 +131,27 @@ final class Giant_IndicatorUITests: XCTestCase {
         let percentageLabel = app.staticTexts["battery-percentage-label"]
         XCTAssertTrue(percentageLabel.waitForExistence(timeout: 2))
         XCTAssertEqual(percentageLabel.label, "64%")
+    }
+
+    @MainActor
+    func testBatteryPercentageTapCyclesDisplayStyle() throws {
+        let app = configuredApp(resetIndicatorPreferences: true)
+        app.launchArguments += [batteryLevelArgument, "55"]
+        app.launch()
+
+        let batteryTile = app.otherElements["indicator-tile-battery"]
+        XCTAssertTrue(batteryTile.waitForExistence(timeout: 2))
+
+        let percentageControl = app.descendants(matching: .any)["battery-percentage-label"].firstMatch
+        XCTAssertTrue(percentageControl.waitForExistence(timeout: 2))
+
+        percentageControl.tap()
+        percentageControl.tap()
+        percentageControl.tap()
+
+        XCTAssertTrue(batteryTile.exists)
+        XCTAssertTrue(percentageControl.exists)
+        XCTAssertEqual(percentageControl.label, "55%")
     }
 
     @MainActor
@@ -212,8 +250,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += ["--ui-testing-force-permission-not-determined"]
         app.launch()
 
-        app.buttons["open-settings-button"].tap()
-        XCTAssertTrue(app.otherElements["settings-view"].waitForExistence(timeout: 2))
+        openSettings(in: app)
 
         let weatherToggle = app.switches["indicator-toggle-weather"]
         XCTAssertTrue(weatherToggle.waitForExistence(timeout: 2))
@@ -265,7 +302,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += [weatherDeniedArgument]
         app.launch()
 
-        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
         assertDefaultDashboardTilesAreVisible(app)
         XCTAssertFalse(app.otherElements["indicator-tile-weather"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-volume"].exists)
@@ -284,7 +320,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments += [weatherDeniedArgument]
         app.launch()
 
-        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
         assertDefaultDashboardTilesAreVisible(app)
         assertDashboardTilesDoNotOverlap(app, tileIdentifiers: defaultDashboardTileIdentifiers)
     }
@@ -326,7 +361,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
         assertDashboardHasNoScrollView(app)
         assertDefaultDashboardTilesAreVisible(app)
 
@@ -335,7 +369,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         #endif
         assertDefaultDashboardTilesAreVisible(app)
 
-        app.buttons["open-settings-button"].tap()
+        openSettings(in: app)
         let batteryToggle = app.switches["indicator-toggle-battery"]
         XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
         tapSwitch("indicator-toggle-battery", in: app)
@@ -343,7 +377,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["indicator-tile-battery"].exists)
         assertDashboardHasNoScrollView(app)
 
-        app.buttons["open-settings-button"].tap()
+        openSettings(in: app)
         XCTAssertTrue(batteryToggle.waitForExistence(timeout: 2))
         tapSwitch("indicator-toggle-battery", in: app)
         app.buttons["Done"].tap()
@@ -391,9 +425,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         let app = configuredApp(resetIndicatorPreferences: true)
         app.launch()
 
-        let openSettingsButton = app.buttons["open-settings-button"]
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-        openSettingsButton.tap()
+        openSettings(in: app)
 
         let statusBarToggle = app.switches["display-toggle-show-status-bar"]
         XCTAssertTrue(statusBarToggle.waitForExistence(timeout: 2))
@@ -412,8 +444,7 @@ final class Giant_IndicatorUITests: XCTestCase {
         app.launchArguments = []
         app.launch()
 
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-        openSettingsButton.tap()
+        openSettings(in: app)
         XCTAssertTrue(statusBarToggle.waitForExistence(timeout: 2))
 
         #if canImport(UIKit) && !os(macOS)
@@ -470,8 +501,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         ]
 
         app.launch()
-
-        XCTAssertTrue(app.buttons["open-settings-button"].waitForExistence(timeout: 3))
 
         XCTAssertEqual(
             app.scrollViews.count, 0,
@@ -532,6 +561,21 @@ final class Giant_IndicatorUITests: XCTestCase {
         XCTAssertEqual(visibleCount, defaultDashboardTileCount)
     }
 
+    private func openSettings(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).doubleTap()
+        let settingsView = app.otherElements["settings-view"]
+        XCTAssertTrue(
+            settingsView.waitForExistence(timeout: 2),
+            "Settings sheet should appear after double tap.",
+            file: file,
+            line: line
+        )
+    }
+
     private func assertDashboardTilesDoNotOverlap(
         _ app: XCUIApplication,
         tileIdentifiers: [String]
@@ -556,9 +600,7 @@ final class Giant_IndicatorUITests: XCTestCase {
     }
 
     private func enableIndicators(_ kinds: [String], in app: XCUIApplication) {
-        let openSettingsButton = app.buttons["open-settings-button"]
-        XCTAssertTrue(openSettingsButton.waitForExistence(timeout: 2))
-        openSettingsButton.tap()
+        openSettings(in: app)
 
         for kind in kinds {
             let toggle = app.switches["indicator-toggle-\(kind)"]

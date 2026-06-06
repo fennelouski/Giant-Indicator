@@ -151,6 +151,18 @@ struct MasonryLayoutPlanTests {
         #expect(narrow.layoutSignature != wide.layoutSignature)
     }
 
+    @Test func layoutDoesNotReserveSettingsChromeColumn() async throws {
+        let size = CGSize(width: 393, height: 750)
+        let plan = MasonryLayoutPlan.build(
+            indicators: Self.defaultFavoritePlaceholders,
+            in: size
+        )
+
+        #expect(!plan.layoutSignature.hasSuffix("-settings"))
+        #expect(plan.columns.allSatisfy { !$0.items.isEmpty })
+        #expect(plan.fitsIn(size: size))
+    }
+
     private func visibleKindLabelCount(in plan: MasonryLayoutPlan) -> Int {
         plan.columns.flatMap(\.items).filter { item in
             item.showsKindLabel && TileKindLabelVisibility.strippingOrder.contains(item.placeholder.kind)

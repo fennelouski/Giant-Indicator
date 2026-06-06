@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var weatherViewModel: WeatherViewModel
     @StateObject private var permissionGate = PermissionGateCoordinator()
+    @StateObject private var settingsHintPresenter = SettingsHintPresenter()
     @State private var isSettingsPresented = false
     @State private var indicatorVisibility: [IndicatorKind: Bool] = IndicatorPreferences.loadVisibility()
     @State private var keepScreenOn = DisplayPreferences.keepScreenOn
@@ -60,57 +61,60 @@ struct ContentView: View {
     }
 
     var body: some View {
-        ZStack {
-            dashboardBackground
-                .ignoresSafeArea()
+        GeometryReader { rootProxy in
+            ZStack {
+                dashboardBackground
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .gesture(backgroundTapGesture)
 
-            if visibleIndicators.isEmpty {
-                EmptyIndicatorsView {
-                    isSettingsPresented = true
-                }
-            } else {
-                GeometryReader { proxy in
-                    let layout = MasonryLayoutPlan.build(
-                        indicators: visibleIndicators,
-                        in: proxy.size
-                    )
+                if visibleIndicators.isEmpty {
+                    EmptyIndicatorsView()
+                } else {
+                    GeometryReader { proxy in
+                        let layout = MasonryLayoutPlan.build(
+                            indicators: visibleIndicators,
+                            in: proxy.size
+                        )
 
-                    HStack(alignment: .top, spacing: layout.spacing) {
-                        ForEach(Array(layout.columns.enumerated()), id: \.offset) { _, column in
-                            VStack(spacing: layout.spacing) {
-                                ForEach(column.items) { item in
-                                    let metrics = TileMetrics(width: item.width, height: item.height)
-                                    tileView(
-                                        for: item.placeholder,
-                                        metrics: metrics,
-                                        showsKindLabel: item.showsKindLabel
-                                    )
-                                    .frame(height: item.height)
+                        HStack(alignment: .top, spacing: layout.spacing) {
+                            ForEach(Array(layout.columns.enumerated()), id: \.offset) { _, column in
+                                VStack(spacing: layout.spacing) {
+                                    ForEach(column.items) { item in
+                                        let metrics = TileMetrics(width: item.width, height: item.height)
+                                        tileView(
+                                            for: item.placeholder,
+                                            metrics: metrics,
+                                            showsKindLabel: item.showsKindLabel
+                                        )
+                                        .frame(height: item.height)
+                                    }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .top)
                             }
-                            .frame(maxWidth: .infinity, alignment: .top)
                         }
+                        .padding(layout.outerPadding)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .animation(.easeInOut(duration: 0.2), value: layout.layoutSignature)
                     }
-                    .padding(layout.outerPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .animation(.easeInOut(duration: 0.2), value: layout.layoutSignature)
                 }
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            Color.clear
-                .frame(height: 56)
-                .allowsHitTesting(false)
-        }
-        .overlay(alignment: .topTrailing) {
-            SettingsGearButton {
+            .overlay(alignment: .bottom) {
+                if settingsHintPresenter.isVisible {
+                    SettingsHintToast(message: SettingsHintPresenter.message)
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: settingsHintPresenter.isVisible)
+            .contentShape(Rectangle())
+            .simultaneousGesture(doubleTapToOpenSettingsGesture)
+            .simultaneousGesture(longPressHintGesture)
+            .simultaneousGesture(edgePanHintGesture(in: rootProxy.size))
+            .accessibilityHint("Double tap anywhere to open settings")
+            .accessibilityAction(named: "Open Settings") {
                 isSettingsPresented = true
             }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-            .padding(.trailing, 16)
-            .accessibilityLabel("Open Settings")
-            .accessibilityIdentifier("open-settings-button")
         }
         .keepScreenAwake(keepScreenOn)
         .statusBarVisibility(showStatusBar)
@@ -276,6 +280,38 @@ struct ContentView: View {
     private func isIndicatorVisible(_ kind: IndicatorKind) -> Bool {
         guard kind.isFeatureEnabled else { return false }
         return indicatorVisibility[kind, default: kind.defaultVisibility]
+    }
+
+    private var doubleTapToOpenSettingsGesture: some Gesture {
+        TapGesture(count: 2).onEnded {
+            isSettingsPresented = true
+        }
+    }
+
+    private var backgroundTapGesture: some Gesture {
+        TapGesture(count: 2)
+            .onEnded { isSettingsPresented = true }
+            .exclusively(before: TapGesture(count: 1).onEnded {
+                settingsHintPresenter.requestPresentation()
+            })
+    }
+
+    private var longPressHintGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            settingsHintPresenter.requestPresentation()
+        }
+    }
+
+    private func edgePanHintGesture(in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onEnded { value in
+                let edgeThreshold: CGFloat = 24
+                let startX = value.startLocation.x
+                let isEdgeStart = startX < edgeThreshold || startX > size.width - edgeThreshold
+                let dragDistance = hypot(value.translation.width, value.translation.height)
+                guard isEdgeStart, dragDistance > 20 else { return }
+                settingsHintPresenter.requestPresentation()
+            }
     }
 
     @ViewBuilder

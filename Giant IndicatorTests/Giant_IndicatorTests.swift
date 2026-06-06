@@ -637,6 +637,41 @@ struct Giant_IndicatorTests {
         #expect(IndicatorKind.clock.displayName == "Time")
     }
 
+    @Test @MainActor func settingsHintPresenter_ignoresRequestsWhileVisible() async throws {
+        var current = Date(timeIntervalSince1970: 0)
+        let presenter = SettingsHintPresenter(cooldown: 10, displayDuration: 100, now: { current })
+
+        presenter.requestPresentation()
+        #expect(presenter.isVisible)
+
+        presenter.requestPresentation()
+        #expect(presenter.isVisible)
+    }
+
+    @Test @MainActor func settingsHintPresenter_respectsCooldown() async throws {
+        var current = Date(timeIntervalSince1970: 0)
+        let presenter = SettingsHintPresenter(cooldown: 10, displayDuration: 0.01, now: { current })
+
+        presenter.requestPresentation()
+        #expect(presenter.isVisible)
+
+        try await Task.sleep(for: .milliseconds(20))
+        presenter.dismiss()
+        #expect(!presenter.isVisible)
+
+        current = current.addingTimeInterval(5)
+        presenter.requestPresentation()
+        #expect(!presenter.isVisible)
+
+        current = current.addingTimeInterval(6)
+        presenter.requestPresentation()
+        #expect(presenter.isVisible)
+    }
+
+    @Test func settingsHintPresenter_message() async throws {
+        #expect(SettingsHintPresenter.message == "Double tap to open settings")
+    }
+
     @Test func indicatorKind_settingsGroupMapping() async throws {
         #expect(IndicatorKind.battery.settingsGroup == .battery)
         #expect(IndicatorKind.wifi.settingsGroup == .wifi)

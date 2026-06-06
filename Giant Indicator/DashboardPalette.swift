@@ -102,25 +102,6 @@ struct DashboardPalette: Equatable {
     }
 }
 
-struct SettingsGearButton: View {
-    @Environment(\.dashboardPalette) private var palette
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(palette.foreground)
-                .frame(width: 44, height: 44)
-                .background(palette.gearButtonFill, in: Circle())
-                .overlay {
-                    Circle()
-                        .stroke(palette.gearButtonStroke, lineWidth: 1)
-                }
-        }
-    }
-}
-
 private struct DashboardPaletteKey: EnvironmentKey {
     static let defaultValue = DashboardPalette(colorScheme: .dark)
 }

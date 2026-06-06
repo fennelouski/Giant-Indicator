@@ -9,7 +9,6 @@ import SwiftUI
 
 struct EmptyIndicatorsView: View {
     @Environment(\.dashboardPalette) private var palette
-    let openSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 20) {
@@ -22,17 +21,10 @@ struct EmptyIndicatorsView: View {
                 .foregroundStyle(palette.foreground)
                 .multilineTextAlignment(.center)
 
-            Text("Open Settings to choose indicators.")
+            Text("Double tap anywhere to choose indicators.")
                 .font(.system(size: 20, weight: .medium, design: .rounded))
                 .foregroundStyle(palette.mutedText)
                 .multilineTextAlignment(.center)
-
-            Button("Open Settings") {
-                openSettings()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(palette.gearButtonFill)
-            .foregroundStyle(palette.foreground)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
