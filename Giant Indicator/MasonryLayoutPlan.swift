@@ -428,7 +428,12 @@ struct MasonryLayoutPlan {
             }
         }
         let maxColumnHeight = columnHeights.max() ?? 1
-        let preferredScale = min(max(availableHeight / maxColumnHeight, 0), 1.0)
+        let preferredScale: CGFloat = {
+            if indicators.count == 1 {
+                return availableHeight / maxColumnHeight
+            }
+            return min(max(availableHeight / maxColumnHeight, 0), 1.0)
+        }()
         let maxItemsInAnyColumn = indicatorColumns.map(\.count).max() ?? 1
         let adaptiveMinimumHeight = adaptiveMinimumTileHeight(
             maxItemsInColumn: maxItemsInAnyColumn,
@@ -699,7 +704,7 @@ struct MasonryLayoutPlan {
             return 250
         case .nowPlaying:
             return 280
-        case .wifi, .speaker, .bluetooth, .ringer:
+        case .wifi, .speaker, .bluetooth:
             return 220
         case .clock:
             return 240

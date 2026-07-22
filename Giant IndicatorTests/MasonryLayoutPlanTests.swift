@@ -23,7 +23,6 @@ struct MasonryLayoutPlanTests {
         IndicatorPlaceholder(kind: .wifi, value: "Connected", subtitle: "Wi-Fi active"),
         IndicatorPlaceholder(kind: .speaker, value: "Speaker", subtitle: "Built-in"),
         IndicatorPlaceholder(kind: .bluetooth, value: "Off", subtitle: "Bluetooth disabled"),
-        IndicatorPlaceholder(kind: .ringer, value: "Silent", subtitle: "Muted alerts"),
         IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
         IndicatorPlaceholder(kind: .date, value: "Wednesday, June 3")
     ]
@@ -172,6 +171,20 @@ struct MasonryLayoutPlanTests {
         #expect(!plan.layoutSignature.hasSuffix("-settings"))
         #expect(plan.columns.allSatisfy { !$0.items.isEmpty })
         #expect(plan.fitsIn(size: size))
+    }
+
+    @Test func singleIndicatorFillsAvailableVerticalSpace() async throws {
+        let size = CGSize(width: 393, height: 852)
+        let outerPadding: CGFloat = 20
+        let availableHeight = max(size.height - (outerPadding * 2), 1)
+        let indicators = [IndicatorPlaceholder(kind: .battery, value: "85%")]
+        let plan = MasonryLayoutPlan.build(indicators: indicators, in: size)
+
+        let items = indicatorItems(in: plan)
+        #expect(items.count == 1)
+        #expect(items[0].height >= availableHeight - 1)
+        #expect(plan.fitsIn(size: size))
+        #expect(plan.satisfiesReadableTileMetrics)
     }
 
     private func indicatorItems(in plan: MasonryLayoutPlan) -> [MasonryLayoutPlan.Item] {

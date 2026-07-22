@@ -61,4 +61,13 @@ struct TileMetricsTests {
 
         #expect(withLabel > withoutLabel)
     }
+
+    @Test func batteryIconHeightScalesOnTallTiles() async throws {
+        let compact = TileMetrics(width: 200, height: 180)
+        let tall = TileMetrics(width: 353, height: 700)
+
+        #expect(tall.batteryIconHeight > 64)
+        #expect(tall.batteryIconHeight < tall.height * 0.25)
+        #expect(compact.batteryIconHeight <= 64)
+    }
 }

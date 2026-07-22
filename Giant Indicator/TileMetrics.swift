@@ -115,7 +115,11 @@ struct TileMetrics {
 
     /// Secondary fill icon under the percentage (PR-17).
     var batteryIconHeight: CGFloat {
-        clamp(height * 0.2, min: boundedMin(32, 0.14), max: min(64, height * 0.28))
+        clamp(
+            height * 0.2,
+            min: boundedMin(32, 0.14),
+            max: min(max(64, height * 0.14), height * 0.22)
+        )
     }
 
     var titleFontSize: CGFloat {

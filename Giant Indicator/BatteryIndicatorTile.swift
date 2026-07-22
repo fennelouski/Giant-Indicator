@@ -67,7 +67,12 @@ struct BatteryIndicatorTile: View {
     }
 
     private func standardLayout(animatesLevelChanges: Bool, chargingPulse: Bool) -> some View {
-        VStack(spacing: metrics.contentSpacing) {
+        let hasVerticalRoom = metrics.height > metrics.minimumContentHeight(for: .battery, kindLabelVisibility: .hidingBatteryAndVolume) * 1.35
+
+        return VStack(spacing: metrics.contentSpacing) {
+            if hasVerticalRoom {
+                Spacer(minLength: 0)
+            }
             tappablePercentageSection(fontSize: metrics.batteryPercentageFontSize)
             batteryGlyphSection(
                 height: metrics.batteryIconHeight,
@@ -76,6 +81,9 @@ struct BatteryIndicatorTile: View {
             )
             if batteryState.isDataAvailable {
                 statusSection
+            }
+            if hasVerticalRoom {
+                Spacer(minLength: 0)
             }
         }
     }

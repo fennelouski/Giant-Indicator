@@ -39,10 +39,6 @@ struct ContentView: View {
                 connectivityViewModel.state.bluetooth,
                 kind: .bluetooth
             ),
-            IndicatorPlaceholder.fromConnectivityIndicator(
-                connectivityViewModel.state.ringer,
-                kind: .ringer
-            ),
             IndicatorPlaceholder.fromWeatherState(weatherViewModel.displayState),
             IndicatorPlaceholder(kind: .clock, value: clockViewModel.state.timeText),
             IndicatorPlaceholder(kind: .date, value: dateViewModel.state.dateText)
@@ -346,8 +342,7 @@ struct ContentView: View {
             WiFiIndicatorTile(wifiState: connectivityViewModel.state.wifi, metrics: metrics)
         } else if
             placeholder.kind == .speaker ||
-            placeholder.kind == .bluetooth ||
-            placeholder.kind == .ringer
+            placeholder.kind == .bluetooth
         {
             ConnectivityIndicatorTile(placeholder: placeholder, metrics: metrics)
         } else if placeholder.kind == .clock {

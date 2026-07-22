@@ -26,7 +26,6 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
     case wifi
     case speaker
     case bluetooth
-    case ringer
     case clock
     case date
 
@@ -58,8 +57,6 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "Speaker/Output"
         case .bluetooth:
             return "Bluetooth"
-        case .ringer:
-            return "Ringer/Silent"
         case .clock:
             return "Time"
         case .date:
@@ -87,8 +84,6 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return "hifispeaker.fill"
         case .bluetooth:
             return "dot.radiowaves.left.and.right"
-        case .ringer:
-            return "bell.fill"
         case .clock:
             return "clock.fill"
         case .date:
@@ -131,12 +126,6 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
 
     var platformCapabilityHandling: PlatformCapabilityHandling {
         switch self {
-        case .ringer:
-            #if canImport(UIKit)
-            return .showUnavailableState(reason: "iOS does not expose ringer switch state")
-            #else
-            return .hidden
-            #endif
         case .speaker:
             #if canImport(AVFoundation) && canImport(UIKit)
             return .supported
@@ -162,7 +151,7 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
             return .timeAndDate
         case .volume, .playback, .nowPlaying:
             return .media
-        case .speaker, .bluetooth, .ringer:
+        case .speaker, .bluetooth:
             return .connectivity
         case .weather:
             return .weather

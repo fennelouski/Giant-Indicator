@@ -154,13 +154,11 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         let wifiState = makeWiFiState()
         let speakerState = makeSpeakerState()
         let bluetoothState = makeBluetoothState()
-        let ringerState = makeRingerState()
 
         let snapshot = ConnectivityState(
             wifi: wifiState,
             speaker: speakerState,
-            bluetooth: bluetoothState,
-            ringer: ringerState
+            bluetooth: bluetoothState
         )
 
         guard subject.value != snapshot else { return }
@@ -326,24 +324,6 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         )
     }
 
-    private func makeRingerState() -> ConnectivityIndicatorState {
-        #if canImport(UIKit)
-        ConnectivityIndicatorState.unavailable(
-            title: "Ringer/Silent",
-            subtitle: "iOS does not expose ringer switch state",
-            symbolName: "bell.slash",
-            reason: "Platform Limited"
-        )
-        #else
-        ConnectivityIndicatorState.unavailable(
-            title: "Ringer/Silent",
-            subtitle: "Ringer mode is not available on this platform",
-            symbolName: "bell.slash",
-            reason: "Unsupported"
-        )
-        #endif
-    }
-
     #if canImport(AVFoundation) && canImport(UIKit)
     private func outputDescription(for port: AVAudioSession.Port) -> (value: String, subtitle: String, symbol: String) {
         switch port {
@@ -372,7 +352,6 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
         let showWiFiName = processInfo.arguments.contains("--ui-testing-show-wifi-network-name")
         let speaker = uiTestArgumentValue(after: "--ui-testing-speaker-status", default: "speaker")
         let bluetooth = uiTestArgumentValue(after: "--ui-testing-bluetooth-status", default: "on")
-        let ringer = uiTestArgumentValue(after: "--ui-testing-ringer-status", default: "unavailable")
 
         return ConnectivityState(
             wifi: wifiStateForUITest(
@@ -382,8 +361,7 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
                 showsNetworkName: showWiFiName || wifiSSID != nil
             ),
             speaker: connectivityStateForSpeaker(speaker),
-            bluetooth: connectivityStateForBluetooth(bluetooth),
-            ringer: connectivityStateForRinger(ringer)
+            bluetooth: connectivityStateForBluetooth(bluetooth)
         )
     }
 
@@ -504,34 +482,6 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
                 subtitle: "Bluetooth status unavailable",
                 symbolName: "bolt.horizontal",
                 reason: "Unavailable"
-            )
-        }
-    }
-
-    private func connectivityStateForRinger(_ value: String) -> ConnectivityIndicatorState {
-        switch value {
-        case "ring":
-            return ConnectivityIndicatorState(
-                title: "Ringer/Silent",
-                valueText: "Ring",
-                subtitleText: "Audible alerts enabled",
-                symbolName: "bell.fill",
-                availability: .available
-            )
-        case "silent":
-            return ConnectivityIndicatorState(
-                title: "Ringer/Silent",
-                valueText: "Silent",
-                subtitleText: "Muted alerts",
-                symbolName: "bell.slash.fill",
-                availability: .available
-            )
-        default:
-            return .unavailable(
-                title: "Ringer/Silent",
-                subtitle: "Status not exposed by API",
-                symbolName: "bell.slash",
-                reason: "Platform Limited"
             )
         }
     }

@@ -20,7 +20,8 @@ struct BatteryIcon: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let capWidth = max(12, proxy.size.width * 0.05)
+            let capHeight = max(18, proxy.size.height * 0.42)
+            let capWidth = min(max(12, proxy.size.width * 0.05), capHeight)
             let shellWidth = max(16, proxy.size.width - capWidth - 10)
             let strokeWidth: CGFloat = 4
             let contentPadding = strokeWidth + 5
@@ -42,7 +43,7 @@ struct BatteryIcon: View {
 
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(palette.foreground.opacity(0.55))
-                    .frame(width: capWidth, height: max(18, proxy.size.height * 0.42))
+                    .frame(width: capWidth, height: capHeight)
             }
             .overlay {
                 if isPluggedIn {

@@ -370,7 +370,6 @@ struct Giant_IndicatorTests {
         #expect(!IndicatorKind.playback.defaultVisibility)
         #expect(!IndicatorKind.nowPlaying.defaultVisibility)
         #expect(!IndicatorKind.speaker.defaultVisibility)
-        #expect(!IndicatorKind.ringer.defaultVisibility)
         #expect(!IndicatorKind.bluetooth.defaultVisibility)
     }
 
@@ -404,17 +403,6 @@ struct Giant_IndicatorTests {
     @Test func indicatorKind_platformCapabilityVisibility() async throws {
         #expect(IndicatorKind.battery.isVisibleInSettings)
         #expect(IndicatorKind.volume.isVisibleInSettings)
-
-        #if canImport(UIKit)
-        #expect(IndicatorKind.ringer.isVisibleInSettings)
-        #expect(
-            IndicatorKind.ringer.platformCapabilityHandling ==
-                .showUnavailableState(reason: "iOS does not expose ringer switch state")
-        )
-        #else
-        #expect(!IndicatorKind.ringer.isVisibleInSettings)
-        #expect(IndicatorKind.ringer.platformCapabilityHandling == .hidden)
-        #endif
     }
 
     @Test func indicatorFallbackPresentation_unknownValueText() async throws {

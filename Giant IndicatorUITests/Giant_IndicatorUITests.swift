@@ -311,7 +311,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["indicator-tile-playback"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-nowPlaying"].exists)
         XCTAssertFalse(app.otherElements["indicator-tile-speaker"].exists)
-        XCTAssertFalse(app.otherElements["indicator-tile-ringer"].exists)
     }
 
     @MainActor
@@ -356,8 +355,7 @@ final class Giant_IndicatorUITests: XCTestCase {
             "--ui-testing-volume-level", "35",
             connectivityOverrideArgument,
             "--ui-testing-wifi-status", "connected",
-            "--ui-testing-speaker-status", "speaker",
-            "--ui-testing-ringer-status", "silent"
+            "--ui-testing-speaker-status", "speaker"
         ]
         app.launch()
 
@@ -393,12 +391,11 @@ final class Giant_IndicatorUITests: XCTestCase {
             connectivityOverrideArgument,
             "--ui-testing-wifi-status", "connected",
             "--ui-testing-wifi-signal", "72",
-            "--ui-testing-speaker-status", "headphones",
-            "--ui-testing-ringer-status", "silent"
+            "--ui-testing-speaker-status", "headphones"
         ]
         app.launch()
 
-        enableIndicators(["wifi", "speaker", "ringer"], in: app)
+        enableIndicators(["wifi", "speaker"], in: app)
 
         XCTAssertTrue(app.otherElements["indicator-tile-wifi"].waitForExistence(timeout: 2))
         #if os(macOS)
@@ -414,10 +411,6 @@ final class Giant_IndicatorUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["speaker-subtitle-label"].label, "Wired output")
 
         XCTAssertFalse(app.otherElements["indicator-tile-bluetooth"].exists)
-
-        XCTAssertTrue(app.otherElements["indicator-tile-ringer"].waitForExistence(timeout: 2))
-        XCTAssertEqual(app.staticTexts["ringer-value-label"].label, "Silent")
-        XCTAssertEqual(app.staticTexts["ringer-subtitle-label"].label, "Muted alerts")
     }
 
     @MainActor
