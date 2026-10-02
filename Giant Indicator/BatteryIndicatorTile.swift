@@ -10,6 +10,7 @@ import SwiftUI
 struct BatteryIndicatorTile: View {
     @Environment(\.dashboardPalette) private var palette
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var viewModel: BatteryViewModel
     let metrics: TileMetrics
     var showsKindLabel: Bool = true
@@ -59,7 +60,7 @@ struct BatteryIndicatorTile: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(metrics.padding)
-        .animation(.easeInOut(duration: 0.25), value: effectiveStyle)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: effectiveStyle)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier("indicator-tile-battery")

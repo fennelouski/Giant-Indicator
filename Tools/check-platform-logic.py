@@ -103,6 +103,34 @@ static func dashboardBackground_matchesVisibleTextPalette() {
 }
 ''')
 pieces.append('''
+struct BatteryMotionFixture {
+    var chargingPulse = false
+    var isPluggedIn = false
+    var animatesLevelChanges = false
+    var reduceMotion = false
+''')
+battery_icon_source = (ROOT / "Giant Indicator/BatteryIcon.swift").read_text()
+for anchor in ("private var chargingPulseActive: Bool", "private var levelAnimation: Animation?"):
+    pieces.append(declaration(battery_icon_source, anchor).replace("private var", "var", 1))
+pieces.append('''
+}
+static func batteryMotion_respectsSystemPreference() {
+    var battery = BatteryMotionFixture()
+    check(!battery.chargingPulseActive && battery.levelAnimation == nil)
+    battery.chargingPulse = true
+    check(!battery.chargingPulseActive)
+    battery.isPluggedIn = true
+    battery.animatesLevelChanges = true
+    check(battery.chargingPulseActive && battery.levelAnimation != nil)
+    battery.reduceMotion = true
+    check(!battery.chargingPulseActive && battery.levelAnimation == nil)
+    battery.reduceMotion = false
+    check(battery.chargingPulseActive && battery.levelAnimation != nil)
+    battery.isPluggedIn = false
+    check(!battery.chargingPulseActive)
+}
+''')
+pieces.append('''
 static func wifiNetworkNameGate_preservesOtherIndicators() {
     guard let suite = ProcessInfo.processInfo.environment["GIANT_INDICATOR_QA_DEFAULTS_SUITE"],
           suite.hasPrefix("giant-indicator.qa."),
@@ -157,7 +185,8 @@ if ProcessInfo.processInfo.arguments.contains("--verify-own-domain-cleanup") {
 pieces.extend("try await " + method + "()\n" for method in methods)
 pieces.append("wifiNetworkNameGate_preservesOtherIndicators()\n")
 pieces.append("dashboardBackground_matchesVisibleTextPalette()\n")
-pieces.append('print("PASS: eleven checks: nine actual unit checks, Wi-Fi permission gate, and exact production background contrast; no app, location manager or audio device instantiated")\n}\n}\n')
+pieces.append("batteryMotion_respectsSystemPreference()\n")
+pieces.append('print("PASS: twelve checks: nine actual unit checks, Wi-Fi permission gate, exact production background contrast and Reduce Motion battery gating; no app, location manager or audio device instantiated")\n}\n}\n')
 source = "\n".join(pieces)
 print("Extracted source SHA256", hashlib.sha256(source.encode()).hexdigest(), flush=True)
 with tempfile.TemporaryDirectory(prefix="giant-indicator-platform-check-") as directory:

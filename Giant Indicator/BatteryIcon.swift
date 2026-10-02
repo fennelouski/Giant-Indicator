@@ -9,6 +9,7 @@ import SwiftUI
 
 struct BatteryIcon: View {
     @Environment(\.dashboardPalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let level: CGFloat
     let fillColor: Color
     let accentColor: Color
@@ -60,6 +61,7 @@ struct BatteryIcon: View {
         .onAppear { updatePulseAnimation() }
         .onChange(of: chargingPulse) { _, _ in updatePulseAnimation() }
         .onChange(of: isPluggedIn) { _, _ in updatePulseAnimation() }
+        .onChange(of: reduceMotion) { _, _ in updatePulseAnimation() }
     }
 
     private var displayFillColor: Color {
@@ -67,11 +69,11 @@ struct BatteryIcon: View {
     }
 
     private var levelAnimation: Animation? {
-        animatesLevelChanges ? .spring(response: 0.45, dampingFraction: 0.82) : nil
+        animatesLevelChanges && !reduceMotion ? .spring(response: 0.45, dampingFraction: 0.82) : nil
     }
 
     private var chargingPulseActive: Bool {
-        chargingPulse && isPluggedIn
+        chargingPulse && isPluggedIn && !reduceMotion
     }
 
     private func updatePulseAnimation() {
