@@ -33,6 +33,7 @@ pieces = ["import Foundation\nimport SwiftUI\nimport CoreLocation\nimport Combin
 for name in (
     "VolumeState.swift", "IndicatorKind.swift", "ClockTypography.swift", "ClockState.swift",
     "BatteryDrivenScreenBrightness.swift", "StatusBarVisibility.swift",
+    "DashboardPalette.swift", "BatteryReflectiveBackground.swift",
 ):
     pieces.append((ROOT / "Giant Indicator" / name).read_text())
 
@@ -73,6 +74,34 @@ checks = [
 pieces.append("@main @MainActor struct Checks {\n")
 pieces.append("static func check(_ condition: Bool) { precondition(condition) }\n")
 pieces.extend(checks)
+background_source = (ROOT / "Giant Indicator/ContentView.swift").read_text()
+pieces.append('''
+struct DashboardFixture {
+    struct BatteryState { var percentage = 100; var isDataAvailable = true }
+    struct BatteryModel { var state = BatteryState() }
+    var batteryViewModel = BatteryModel()
+    var batteryReflectiveBackground = false
+    var backgroundAppearance = DashboardBackgroundAppearance.dark
+    var colorScheme = ColorScheme.light
+''')
+pieces.append(declaration(background_source, "private var dashboardBackground: Color").replace("private var", "var", 1))
+pieces.append('''
+}
+static func dashboardBackground_matchesVisibleTextPalette() {
+    var dashboard = DashboardFixture()
+    check(dashboard.dashboardBackground == Color.black)
+    dashboard.backgroundAppearance = .light
+    check(dashboard.dashboardBackground == Color.white)
+    dashboard.backgroundAppearance = .system
+    check(dashboard.dashboardBackground == Color.white)
+    dashboard.colorScheme = .dark
+    check(dashboard.dashboardBackground == Color.black)
+    dashboard.batteryReflectiveBackground = true
+    check(dashboard.dashboardBackground == DashboardPalette(batteryPercentage: 100).background)
+    dashboard.batteryViewModel.state.isDataAvailable = false
+    check(dashboard.dashboardBackground == DashboardPalette(batteryPercentage: 0).background)
+}
+''')
 pieces.append('''
 static func wifiNetworkNameGate_preservesOtherIndicators() {
     guard let suite = ProcessInfo.processInfo.environment["GIANT_INDICATOR_QA_DEFAULTS_SUITE"],
@@ -127,7 +156,8 @@ if ProcessInfo.processInfo.arguments.contains("--verify-own-domain-cleanup") {
 ''')
 pieces.extend("try await " + method + "()\n" for method in methods)
 pieces.append("wifiNetworkNameGate_preservesOtherIndicators()\n")
-pieces.append('print("PASS: ten checks: nine actual unit checks plus actual Wi-Fi name gate Continue/Cancel/basic-status/weather independence; no app, location manager or audio device instantiated")\n}\n}\n')
+pieces.append("dashboardBackground_matchesVisibleTextPalette()\n")
+pieces.append('print("PASS: eleven checks: nine actual unit checks, Wi-Fi permission gate, and exact production background contrast; no app, location manager or audio device instantiated")\n}\n}\n')
 source = "\n".join(pieces)
 print("Extracted source SHA256", hashlib.sha256(source.encode()).hexdigest(), flush=True)
 with tempfile.TemporaryDirectory(prefix="giant-indicator-platform-check-") as directory:

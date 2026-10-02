@@ -256,7 +256,7 @@ struct ContentView: View {
         }
     }
 
-    @Environment(\.dashboardPalette) private var dashboardPalette
+    @Environment(\.colorScheme) private var colorScheme
 
     private var dashboardBackground: Color {
         if batteryReflectiveBackground {
@@ -265,7 +265,9 @@ struct ContentView: View {
                 : 0
             return BatteryReflectiveBackground.backgroundColor(forPercentage: percentage)
         }
-        return dashboardPalette.background
+        return DashboardPalette(
+            colorScheme: backgroundAppearance.preferredColorScheme ?? colorScheme
+        ).background
     }
 
     private func isIndicatorVisible(_ kind: IndicatorKind) -> Bool {
