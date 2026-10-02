@@ -1,14 +1,6 @@
 import Combine
 import Foundation
 
-#if canImport(MediaPlayer)
-import MediaPlayer
-#endif
-
-#if canImport(UIKit)
-import UIKit
-#endif
-
 protocol NowPlayingStateProviding {
     func nowPlayingStatePublisher() -> AnyPublisher<NowPlayingState, Never>
 }
@@ -25,37 +17,9 @@ struct SystemNowPlayingProvider: NowPlayingStateProviding {
             return Just(overrideState).eraseToAnyPublisher()
         }
 
-        #if canImport(MediaPlayer)
-        let notificationCenter = NotificationCenter.default
-        var publishers = [AnyPublisher<NowPlayingState, Never>]()
-
-        #if canImport(UIKit)
-        publishers.append(
-            notificationCenter.publisher(for: UIApplication.didBecomeActiveNotification)
-                .map { _ in snapshotNowPlayingState() }
-                .eraseToAnyPublisher()
-        )
-        #endif
-
-        publishers.append(
-            Timer.publish(every: 2, on: .main, in: .common)
-                .autoconnect()
-                .map { _ in snapshotNowPlayingState() }
-                .eraseToAnyPublisher()
-        )
-
-        let merged = Publishers.MergeMany(publishers).eraseToAnyPublisher()
-
-        return Just(snapshotNowPlayingState())
-            .merge(with: merged)
-            .removeDuplicates()
-            .eraseToAnyPublisher()
-        #else
         return Just(
-            NowPlayingState(availability: .unavailable(reason: "Unsupported"))
-        )
-        .eraseToAnyPublisher()
-        #endif
+            NowPlayingState(availability: .unavailable(reason: "Other apps' media is unavailable"))
+        ).eraseToAnyPublisher()
     }
 
     private func makeUITestOverrideState() -> NowPlayingState? {
@@ -121,51 +85,3 @@ struct SystemNowPlayingProvider: NowPlayingStateProviding {
         return value.isEmpty ? nil : value
     }
 }
-
-#if canImport(MediaPlayer)
-private func snapshotNowPlayingState() -> NowPlayingState {
-    guard let nowPlayingInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
-        return .inactive
-    }
-
-    let title = trimmedString(nowPlayingInfo[MPMediaItemPropertyTitle] as? String)
-    let artist = trimmedString(nowPlayingInfo[MPMediaItemPropertyArtist] as? String)
-    let album = trimmedString(nowPlayingInfo[MPMediaItemPropertyAlbumTitle] as? String)
-
-    guard title != nil || artist != nil || album != nil else {
-        return .inactive
-    }
-
-    let resolvedTitle: String
-    let resolvedArtist: String?
-
-    if let title {
-        resolvedTitle = title
-        resolvedArtist = artist
-    } else if let artist {
-        resolvedTitle = artist
-        resolvedArtist = nil
-    } else if let album {
-        resolvedTitle = album
-        resolvedArtist = nil
-    } else {
-        return .inactive
-    }
-
-    return NowPlayingState(
-        availability: .active(
-            NowPlayingMetadata(
-                title: resolvedTitle,
-                artist: resolvedArtist,
-                album: album
-            )
-        )
-    )
-}
-
-private func trimmedString(_ value: String?) -> String? {
-    guard let value else { return nil }
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-}
-#endif

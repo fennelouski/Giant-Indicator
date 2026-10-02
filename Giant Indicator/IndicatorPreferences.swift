@@ -8,7 +8,7 @@
 import Foundation
 
 enum IndicatorPreferences {
-    static let defaults = UserDefaults.standard
+    static let defaults = DisplayPreferences.defaults
 
     static var allVisibilityKeys: [String] {
         IndicatorKind.allCases.map(\.visibilityStorageKey)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var weatherViewModel: WeatherViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var permissionGate = PermissionGateCoordinator()
     @StateObject private var settingsHintPresenter = SettingsHintPresenter()
     @State private var isSettingsPresented = false
@@ -91,7 +92,7 @@ struct ContentView: View {
                         }
                         .padding(layout.outerPadding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .animation(.easeInOut(duration: 0.2), value: layout.layoutSignature)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: layout.layoutSignature)
                     }
                 }
             }
@@ -99,10 +100,10 @@ struct ContentView: View {
                 if settingsHintPresenter.isVisible {
                     SettingsHintToast(message: SettingsHintPresenter.message)
                         .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: settingsHintPresenter.isVisible)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settingsHintPresenter.isVisible)
             .contentShape(Rectangle())
             .simultaneousGesture(doubleTapToOpenSettingsGesture)
             .simultaneousGesture(longPressHintGesture)
@@ -112,6 +113,27 @@ struct ContentView: View {
                 isSettingsPresented = true
             }
         }
+        #if os(macOS)
+        .focusedSceneValue(\.giantIndicatorSettingsPresentation, $isSettingsPresented)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Settings", systemImage: "gearshape") {
+                    isSettingsPresented = true
+                }
+                .accessibilityIdentifier("open-settings-button")
+            }
+        }
+        #elseif os(visionOS)
+        .safeAreaInset(edge: .top, alignment: .trailing, spacing: 0) {
+            Button("Settings", systemImage: "gearshape") {
+                isSettingsPresented = true
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityIdentifier("open-settings-button")
+            .padding(12)
+        }
+        #endif
         .keepScreenAwake(keepScreenOn)
         .statusBarVisibility(showStatusBar)
         .batteryDrivenScreenBrightness(
@@ -152,7 +174,7 @@ struct ContentView: View {
             batteryDataAvailable: batteryViewModel.state.isDataAvailable
         )
         .animation(
-            batteryReflectiveBackground ? .easeInOut(duration: 0.35) : nil,
+            batteryReflectiveBackground && !reduceMotion ? .easeInOut(duration: 0.35) : nil,
             value: batteryViewModel.state.percentage
         )
         .onAppear {
@@ -165,27 +187,6 @@ struct ContentView: View {
         .onChange(of: indicatorVisibility) { _, _ in
             syncBluetoothMonitoring()
             Task { await syncWeatherState() }
-        }
-        .alert(
-            permissionGate.pendingAlert?.title ?? "",
-            isPresented: permissionAlertIsPresented,
-            presenting: permissionGate.pendingAlert
-        ) { alert in
-            Button("Cancel", role: .cancel) {
-                var visibility = indicatorVisibility
-                permissionGate.cancelEducation(currentVisibility: &visibility)
-                indicatorVisibility = visibility
-            }
-            .accessibilityIdentifier("permission-education-cancel")
-
-            Button("Continue") {
-                var visibility = indicatorVisibility
-                permissionGate.confirmEducation(currentVisibility: &visibility)
-                indicatorVisibility = visibility
-            }
-            .accessibilityIdentifier("permission-education-continue")
-        } message: { alert in
-            Text(alert.message)
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(
@@ -203,20 +204,14 @@ struct ContentView: View {
         }
     }
 
-    private var permissionAlertIsPresented: Binding<Bool> {
-        Binding(
-            get: { permissionGate.pendingAlert != nil },
-            set: { isPresented in
-                if !isPresented {
-                    var visibility = indicatorVisibility
-                    permissionGate.cancelEducation(currentVisibility: &visibility)
-                    indicatorVisibility = visibility
-                }
-            }
-        )
-    }
-
     private func configurePermissionGateHandlers() {
+        permissionGate.onWiFiNetworkNameEnabled = {
+            showWiFiNetworkName = true
+            Task {
+                await weatherViewModel.requestWiFiNetworkNameAccess()
+                connectivityViewModel.updateShowWiFiNetworkName(showWiFiNetworkName)
+            }
+        }
         permissionGate.onIndicatorEnabled = { kind in
             switch kind {
             case .weather:
@@ -354,3 +349,16 @@ struct ContentView: View {
         }
     }
 }
+
+#if os(macOS)
+private struct GiantIndicatorSettingsPresentationKey: FocusedValueKey {
+    typealias Value = Binding<Bool>
+}
+
+extension FocusedValues {
+    var giantIndicatorSettingsPresentation: Binding<Bool>? {
+        get { self[GiantIndicatorSettingsPresentationKey.self] }
+        set { self[GiantIndicatorSettingsPresentationKey.self] = newValue }
+    }
+}
+#endif

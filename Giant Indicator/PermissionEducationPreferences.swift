@@ -6,7 +6,7 @@
 import Foundation
 
 enum PermissionEducationPreferences {
-    static let defaults = UserDefaults.standard
+    static let defaults = DisplayPreferences.defaults
 
     private static func storageKey(for kind: PermissionKind) -> String {
         "permission.education.seen.\(kind.rawValue)"

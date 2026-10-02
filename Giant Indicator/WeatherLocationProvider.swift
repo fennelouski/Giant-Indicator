@@ -9,9 +9,26 @@ enum WeatherLocationResolution: Equatable {
     case unavailable
 }
 
+@MainActor
+final class WeatherLocationRequest {
+    private var readers: [CheckedContinuation<WeatherLocationResolution, Never>] = []
+
+    func add(_ reader: CheckedContinuation<WeatherLocationResolution, Never>) -> Bool {
+        let shouldStart = readers.isEmpty
+        readers.append(reader)
+        return shouldStart
+    }
+
+    func complete(_ resolution: WeatherLocationResolution) {
+        let pending = readers
+        readers.removeAll()
+        for reader in pending { reader.resume(returning: resolution) }
+    }
+}
+
 final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<WeatherLocationResolution, Never>?
+    private let pendingRequest = WeatherLocationRequest()
 
     var authorizationStatus: CLAuthorizationStatus {
         manager.authorizationStatus
@@ -24,10 +41,13 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
     }
 
     func resolveLocation(requestAuthorization: Bool) async -> WeatherLocationResolution {
-        if let location = manager.location,
-           manager.authorizationStatus == .authorizedAlways ||
-           manager.authorizationStatus == .authorizedWhenInUse {
-            return .authorized(location)
+        if let location = manager.location {
+            switch manager.authorizationStatus {
+            case .authorizedAlways, .authorizedWhenInUse:
+                return .authorized(location)
+            default:
+                break
+            }
         }
 
         manager.delegate = self
@@ -35,13 +55,9 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
 
         switch manager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
-            manager.requestLocation()
+            break
         case .notDetermined:
-            if requestAuthorization {
-                manager.requestWhenInUseAuthorization()
-            } else {
-                return .notDetermined
-            }
+            guard requestAuthorization else { return .notDetermined }
         case .denied:
             return .denied
         case .restricted:
@@ -51,22 +67,32 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
         }
 
         return await withCheckedContinuation { continuation in
-            self.continuation = continuation
+            guard pendingRequest.add(continuation) else { return }
+            switch manager.authorizationStatus {
+            case .authorizedAlways, .authorizedWhenInUse:
+                manager.requestLocation()
+            case .notDetermined:
+                manager.requestWhenInUseAuthorization()
+            case .denied:
+                pendingRequest.complete(.denied)
+            case .restricted:
+                pendingRequest.complete(.restricted)
+            @unknown default:
+                pendingRequest.complete(.unavailable)
+            }
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.last {
-            continuation?.resume(returning: .authorized(location))
+            pendingRequest.complete(.authorized(location))
         } else {
-            continuation?.resume(returning: .unavailable)
+            pendingRequest.complete(.unavailable)
         }
-        continuation = nil
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        continuation?.resume(returning: .unavailable)
-        continuation = nil
+        pendingRequest.complete(.unavailable)
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -74,16 +100,13 @@ final class WeatherLocationProvider: NSObject, CLLocationManagerDelegate {
         case .authorizedAlways, .authorizedWhenInUse:
             manager.requestLocation()
         case .denied:
-            continuation?.resume(returning: .denied)
-            continuation = nil
+            pendingRequest.complete(.denied)
         case .restricted:
-            continuation?.resume(returning: .restricted)
-            continuation = nil
+            pendingRequest.complete(.restricted)
         case .notDetermined:
             break
         @unknown default:
-            continuation?.resume(returning: .unavailable)
-            continuation = nil
+            pendingRequest.complete(.unavailable)
         }
     }
 

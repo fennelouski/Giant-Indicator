@@ -21,7 +21,7 @@ struct SettingsView: View {
     @Binding var showStatusBar: Bool
     @Binding var showClockSeconds: Bool
     let indicatorKinds: [IndicatorKind]
-    let permissionGate: PermissionGateCoordinator
+    @ObservedObject var permissionGate: PermissionGateCoordinator
 
     private enum SettingsArea: String, CaseIterable, Identifiable {
         case dashboard, screen, battery, wifi, timeAndDate, media, connectivity, weather
@@ -79,8 +79,33 @@ struct SettingsView: View {
         settingsPresentation
             .accessibilityIdentifier("settings-view")
             #if os(macOS)
-            .frame(minWidth: 500, idealWidth: 980, minHeight: 480, idealHeight: 720)
+            .frame(minWidth: 900, idealWidth: 980, minHeight: 600, idealHeight: 720)
+            #elseif os(visionOS)
+            .frame(width: 1000, height: 700)
             #endif
+            .alert(
+                permissionGate.pendingAlert?.title ?? "",
+                isPresented: permissionAlertIsPresented,
+                presenting: permissionGate.pendingAlert
+            ) { _ in
+                Button("Cancel", role: .cancel) {
+                    permissionGate.cancelEducation(currentVisibility: &indicatorVisibility)
+                }
+                .accessibilityIdentifier("permission-education-cancel")
+                Button("Continue") {
+                    permissionGate.confirmEducation(currentVisibility: &indicatorVisibility)
+                }
+                .accessibilityIdentifier("permission-education-continue")
+            } message: { alert in
+                Text(alert.message)
+            }
+    }
+
+    private var permissionAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { permissionGate.pendingAlert != nil },
+            set: { if !$0 { permissionGate.cancelEducation(currentVisibility: &indicatorVisibility) } }
+        )
     }
 
     @ViewBuilder
@@ -134,10 +159,14 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
+                    .accessibilityIdentifier("settings-done-button")
+                    #if os(macOS)
+                    .keyboardShortcut(.cancelAction)
+                    #endif
                 }
             }
         }
@@ -188,6 +217,10 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("display-picker-background-appearance")
                 }
+                Section("Help") {
+                    Link("Support", destination: URL(string: "https://github.com/fennelouski/Giant-Indicator/blob/main/docs/support.md")!)
+                    Link("Privacy Policy", destination: URL(string: "https://github.com/fennelouski/Giant-Indicator/blob/main/docs/privacy.md")!)
+                }
             case .screen:
                 Section {
                     Toggle(isOn: $keepScreenOn) {
@@ -229,13 +262,17 @@ struct SettingsView: View {
                     }
                 }
             case .wifi:
-                Section("Wi-Fi") {
-                    Toggle(isOn: $showWiFiNetworkName) {
+                Section {
+                    Toggle(isOn: wiFiNetworkNameBinding) {
                         Label("Show Wi-Fi Network Name", systemImage: "wifi")
                     }
                     .accessibilityIdentifier("display-toggle-show-wifi-network-name")
 
                     indicatorVisibilityToggles(for: .wifi)
+                } header: {
+                    Text("Wi-Fi")
+                } footer: {
+                    Text("Network names require Location Services. On iPhone, iPad and Apple Vision Pro, enable Precise Location. If access is off, Wi-Fi still shows connection status.")
                 }
             case .timeAndDate:
                 clockPreviewSection
@@ -271,7 +308,6 @@ struct SettingsView: View {
                     metrics: TileMetrics(width: geometry.size.width, height: 180)
                 )
                 .environment(\.dashboardPalette, palette)
-                .background(palette.background)
                 .allowsHitTesting(false)
                 .accessibilityLabel("Clock sample")
                 .accessibilityValue(state.timeText)
@@ -329,6 +365,21 @@ struct SettingsView: View {
                     currentVisibility: &visibility
                 )
                 indicatorVisibility = visibility
+            }
+        )
+    }
+
+    private var wiFiNetworkNameBinding: Binding<Bool> {
+        Binding(
+            get: { showWiFiNetworkName },
+            set: { value in
+                if value {
+                    var visibility = indicatorVisibility
+                    permissionGate.enableWiFiNetworkName(currentVisibility: &visibility)
+                    indicatorVisibility = visibility
+                } else {
+                    showWiFiNetworkName = false
+                }
             }
         )
     }

@@ -101,9 +101,15 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Default dashboard indicators for fresh installs — giant battery plus charging state.
+    /// Fresh dashboards stay useful on devices without an internal battery.
     static var defaultDashboardFavorites: Set<IndicatorKind> {
+        #if os(visionOS)
+        [.clock, .date]
+        #elseif os(macOS)
+        [.battery, .chargingState, .clock, .date]
+        #else
         [.battery, .chargingState]
+        #endif
     }
 
     var defaultVisibility: Bool {
@@ -126,6 +132,9 @@ enum IndicatorKind: String, CaseIterable, Identifiable {
 
     var platformCapabilityHandling: PlatformCapabilityHandling {
         switch self {
+        case .playback, .nowPlaying:
+            // Public Now Playing APIs describe this app's media, not other apps.
+            return .hidden
         case .speaker:
             #if canImport(AVFoundation) && canImport(UIKit)
             return .supported

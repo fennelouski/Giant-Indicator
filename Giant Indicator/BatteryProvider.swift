@@ -114,6 +114,8 @@ private func uiKitChargingState(from batteryState: UIDevice.BatteryState) -> Bat
     }
 }
 
+#endif
+
 private func uiTestChargingState(from argument: String) -> BatteryChargingState {
     switch argument {
     case "charging":
@@ -124,7 +126,6 @@ private func uiTestChargingState(from argument: String) -> BatteryChargingState 
         return .onBattery
     }
 }
-#endif
 
 #if os(macOS)
 private func snapshotMacBatteryState() -> BatteryState {
@@ -163,7 +164,7 @@ private func macChargingState(from description: [String: Any]) -> BatteryChargin
         return .onBattery
     }
 
-    guard powerSourceState == kIOPSACPowerKey else {
+    guard powerSourceState == kIOPSACPowerValue else {
         return .onBattery
     }
 

@@ -107,7 +107,11 @@ struct Giant_IndicatorTests {
         #expect(IndicatorKind.chargingState.isVisibleInSettings)
         #expect(IndicatorKind.chargingState.settingsGroup == .battery)
         #expect(IndicatorKind.visibleInSettings(for: .battery).contains(.chargingState))
+        #if os(visionOS)
+        #expect(!IndicatorKind.chargingState.defaultVisibility)
+        #else
         #expect(IndicatorKind.chargingState.defaultVisibility)
+        #endif
     }
 
     @Test func weatherLocationProvider_mapsPermissionStates() async throws {
@@ -132,11 +136,14 @@ struct Giant_IndicatorTests {
         #expect(PermissionKind.required(for: .weather) == [.location])
         #expect(PermissionKind.required(for: .bluetooth) == [.bluetooth])
         #expect(PermissionKind.required(for: .battery).isEmpty)
+        #expect(PermissionKind.required(for: .wifi).isEmpty)
+        #expect(PermissionKind.requiredForEnabling(showWiFiNetworkName: true) == [.location])
+        #expect(PermissionKind.requiredForEnabling(showWiFiNetworkName: false).isEmpty)
     }
 
     @Test func permissionEducationPreferences_tracksSeenState() async throws {
         let key = "permission.education.seen.location"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -168,7 +175,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_keepScreenOnDefaultsAndPersists() async throws {
         let key = "display.keepScreenOn"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -187,7 +194,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_backgroundAppearanceDefaultsAndPersists() async throws {
         let key = "display.backgroundAppearance"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -241,7 +248,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_batteryReflectiveBackgroundDefaultsAndPersists() async throws {
         let key = "display.batteryReflectiveBackground"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -301,7 +308,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_batteryTileDisplayStyleDefaultsAndPersists() async throws {
         let key = "display.batteryTileDisplayStyle"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -333,14 +340,16 @@ struct Giant_IndicatorTests {
             ScreenBrightnessControl.unavailableReason ==
                 "Screen brightness control is not available on macOS."
         )
-        #elseif canImport(UIKit)
+        #elseif os(iOS)
         #expect(ScreenBrightnessControl.isPlatformSupported)
+        #else
+        #expect(!ScreenBrightnessControl.isPlatformSupported)
         #endif
     }
 
     @Test func displayPreferences_batteryDrivenScreenBrightnessDefaultsAndPersists() async throws {
         let key = "display.batteryDrivenScreenBrightness"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -365,8 +374,13 @@ struct Giant_IndicatorTests {
         #expect(!IndicatorKind.weather.defaultVisibility)
         #expect(!IndicatorKind.volume.defaultVisibility)
         #expect(!IndicatorKind.wifi.defaultVisibility)
+        #if os(macOS) || os(visionOS)
+        #expect(IndicatorKind.clock.defaultVisibility)
+        #expect(IndicatorKind.date.defaultVisibility)
+        #else
         #expect(!IndicatorKind.clock.defaultVisibility)
         #expect(!IndicatorKind.date.defaultVisibility)
+        #endif
         #expect(!IndicatorKind.playback.defaultVisibility)
         #expect(!IndicatorKind.nowPlaying.defaultVisibility)
         #expect(!IndicatorKind.speaker.defaultVisibility)
@@ -382,7 +396,7 @@ struct Giant_IndicatorTests {
 
     @Test func indicatorPreferences_bluetoothStaysHiddenDespiteStoredPreference() async throws {
         let key = IndicatorKind.bluetooth.visibilityStorageKey
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -477,14 +491,16 @@ struct Giant_IndicatorTests {
             StatusBarVisibilityControl.unavailableReason ==
                 "Status bar control is not available on macOS."
         )
-        #elseif canImport(UIKit)
+        #elseif os(iOS)
         #expect(StatusBarVisibilityControl.isPlatformSupported)
+        #else
+        #expect(!StatusBarVisibilityControl.isPlatformSupported)
         #endif
     }
 
     @Test func displayPreferences_showStatusBarDefaultsAndPersists() async throws {
         let key = "display.showStatusBar"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -503,7 +519,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_showWiFiNetworkNameDefaultsAndPersists() async throws {
         let key = "display.showWiFiNetworkName"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -522,7 +538,7 @@ struct Giant_IndicatorTests {
 
     @Test func displayPreferences_showClockSecondsDefaultsAndPersists() async throws {
         let key = "display.showClockSeconds"
-        let defaults = UserDefaults.standard
+        let defaults = DisplayPreferences.defaults
         let prior = defaults.object(forKey: key)
         defer {
             if let prior {
@@ -758,10 +774,52 @@ struct Giant_IndicatorTests {
         #expect(IndicatorKind.weather.settingsGroup == .weather)
 
         let batteryKinds = IndicatorKind.visibleInSettings(for: .battery)
-        #expect(batteryKinds == [.battery])
+        #expect(batteryKinds == [.battery, .chargingState])
         #expect(IndicatorKind.visibleInSettings(for: .timeAndDate).contains(.clock))
         #expect(IndicatorKind.visibleInSettings(for: .timeAndDate).contains(.date))
         #expect(!IndicatorKind.visibleInSettings(for: .connectivity).contains(.bluetooth))
+        #expect(IndicatorKind.visibleInSettings(for: .media) == [.volume])
+        #expect(IndicatorKind.playback.platformCapabilityHandling == .hidden)
+        #expect(IndicatorKind.nowPlaying.platformCapabilityHandling == .hidden)
+    }
+
+    @Test func volumeSnapshot_resolvesDeviceCapabilitiesWithoutInventingValues() async throws {
+        let master = VolumeSnapshotResolver.state(masterVolume: 0.73, channelVolumes: [0.1, 0.2], isMuted: false)
+        #expect(master.isDataAvailable && master.percentage == 73)
+        let stereo = VolumeSnapshotResolver.state(masterVolume: nil, channelVolumes: [0.2, 0.8], isMuted: false)
+        #expect(stereo.isDataAvailable && stereo.percentage == 50)
+        let muted = VolumeSnapshotResolver.state(masterVolume: 0.73, channelVolumes: [], isMuted: true)
+        #expect(muted.isDataAvailable && muted.percentage == 0)
+        let fixedOutput = VolumeSnapshotResolver.state(masterVolume: nil, channelVolumes: [], isMuted: false)
+        #expect(!fixedOutput.isDataAvailable)
+        let invalid = VolumeSnapshotResolver.state(masterVolume: .nan, channelVolumes: [.infinity], isMuted: false)
+        #expect(!invalid.isDataAvailable)
+        let clamped = VolumeSnapshotResolver.state(masterVolume: 1.2, channelVolumes: [], isMuted: false)
+        #expect(clamped.percentage == 100)
+    }
+
+    @Test func weatherLocationRequest_coalescesReadersAndCanStartAgain() async throws {
+        let request = WeatherLocationRequest()
+        var readers = 0
+        var starts = 0
+        let read = {
+            await withCheckedContinuation { continuation in
+                if request.add(continuation) { starts += 1 }
+                readers += 1
+                if readers == 2 { request.complete(.denied) }
+            }
+        }
+        let first = Task { await read() }
+        let second = Task { await read() }
+        #expect(await first.value == .denied)
+        #expect(await second.value == .denied)
+        #expect(starts == 1)
+
+        let next = await withCheckedContinuation { continuation in
+            #expect(request.add(continuation))
+            request.complete(.unavailable)
+        }
+        #expect(next == .unavailable)
     }
 
     @Test func dateFormatting_usesLocalizedReadableDate() async throws {

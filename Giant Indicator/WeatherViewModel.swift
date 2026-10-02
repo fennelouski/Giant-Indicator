@@ -30,6 +30,10 @@ final class WeatherViewModel: ObservableObject {
         )
     }
 
+    func requestWiFiNetworkNameAccess() async {
+        _ = await locationProvider.resolveLocation(requestAuthorization: true)
+    }
+
     func refresh(requestAuthorization: Bool) async {
         if let uiTestingState = uiTestingDisplayState() {
             displayState = uiTestingState

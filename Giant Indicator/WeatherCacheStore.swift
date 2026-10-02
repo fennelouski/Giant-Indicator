@@ -10,7 +10,7 @@ struct WeatherCacheStore {
     private let defaults: UserDefaults
     private let key = "weather.cache.envelope"
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = DisplayPreferences.defaults) {
         self.defaults = defaults
     }
 

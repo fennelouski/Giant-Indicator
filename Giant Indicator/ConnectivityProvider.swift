@@ -58,7 +58,6 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     }
 
     func updateShowWiFiNetworkName(_ enabled: Bool) {
-        guard showWiFiNetworkName != enabled else { return }
         showWiFiNetworkName = enabled
         if !enabled {
             wifiNetworkName = nil
@@ -249,17 +248,6 @@ final class SystemConnectivityProvider: NSObject, ConnectivityProviding {
     private func makeSpeakerState() -> ConnectivityIndicatorState {
         #if canImport(AVFoundation) && canImport(UIKit)
         let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setActive(true, options: [])
-        } catch {
-            return .unavailable(
-                title: "Speaker/Output",
-                subtitle: "Audio session unavailable",
-                symbolName: "speaker.slash.fill",
-                reason: "Audio Session Error"
-            )
-        }
-
         guard let outputPort = session.currentRoute.outputs.first else {
             return .unavailable(
                 title: "Speaker/Output",

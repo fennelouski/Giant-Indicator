@@ -41,6 +41,25 @@ struct Giant_IndicatorApp: App {
         #if os(macOS)
         .defaultSize(width: 900, height: 600)
         .windowResizability(.contentMinSize)
+        .commands {
+            GiantIndicatorSettingsCommands()
+        }
         #endif
     }
 }
+
+#if os(macOS)
+private struct GiantIndicatorSettingsCommands: Commands {
+    @FocusedBinding(\.giantIndicatorSettingsPresentation) private var isSettingsPresented
+
+    var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                isSettingsPresented = true
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            .disabled(isSettingsPresented == nil)
+        }
+    }
+}
+#endif

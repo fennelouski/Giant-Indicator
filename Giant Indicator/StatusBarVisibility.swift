@@ -14,7 +14,7 @@ import UIKit
 /// Whether the current platform exposes status bar visibility control (PR-23).
 enum StatusBarVisibilityControl {
     static var isPlatformSupported: Bool {
-        #if canImport(UIKit) && !os(macOS)
+        #if os(iOS)
         true
         #else
         false
@@ -34,7 +34,7 @@ struct StatusBarVisibilityModifier: ViewModifier {
     let isVisible: Bool
 
     func body(content: Content) -> some View {
-        #if canImport(UIKit) && !os(macOS)
+        #if os(iOS)
         content.statusBarHidden(!isVisible)
         #else
         content

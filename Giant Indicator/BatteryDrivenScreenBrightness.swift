@@ -32,7 +32,7 @@ enum BatteryDrivenScreenBrightness {
 /// Whether the current platform exposes writable screen brightness (PR-22).
 enum ScreenBrightnessControl {
     static var isPlatformSupported: Bool {
-        #if canImport(UIKit) && !os(macOS)
+        #if os(iOS)
         true
         #else
         false
@@ -48,7 +48,7 @@ enum ScreenBrightnessControl {
     }
 }
 
-#if canImport(UIKit) && !os(macOS)
+#if os(iOS)
 /// Resolves the display's `UIScreen` from the hosting view hierarchy (iOS 26+).
 private struct ScreenContextReader: UIViewRepresentable {
     var onScreenChange: (UIScreen?) -> Void
@@ -92,7 +92,7 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
     let isDataAvailable: Bool
 
     @Environment(\.scenePhase) private var scenePhase
-    #if canImport(UIKit) && !os(macOS)
+    #if os(iOS)
     @State private var activeScreen: UIScreen?
     @State private var brightnessBeforeControl: CGFloat?
     #endif
@@ -100,7 +100,7 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background {
-                #if canImport(UIKit) && !os(macOS)
+                #if os(iOS)
                 ScreenContextReader { screen in
                     if let screen {
                         activeScreen = screen
@@ -131,7 +131,7 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
     }
 
     private func applyBatteryDrivenBrightness() {
-        #if canImport(UIKit) && !os(macOS)
+        #if os(iOS)
         guard let activeScreen else { return }
         let percentage = isDataAvailable ? batteryPercentage : 0
         let target = CGFloat(
@@ -145,7 +145,7 @@ struct BatteryDrivenScreenBrightnessModifier: ViewModifier {
     }
 
     private func stopBrightnessControl() {
-        #if canImport(UIKit) && !os(macOS)
+        #if os(iOS)
         guard let activeScreen, let brightnessBeforeControl else { return }
         activeScreen.brightness = brightnessBeforeControl
         self.brightnessBeforeControl = nil

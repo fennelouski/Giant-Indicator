@@ -2,14 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth access is used to show whether Bluetooth is on or off in the Bluetooth indicator.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Bluetooth access is used to show whether Bluetooth is on or off in the Bluetooth indicator.</string>
 </dict>
 </plist>

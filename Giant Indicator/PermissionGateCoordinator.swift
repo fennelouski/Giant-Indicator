@@ -19,11 +19,22 @@ final class PermissionGateCoordinator: ObservableObject {
     @Published var pendingAlert: PermissionAlertModel?
 
     private var pendingEnableIndicator: IndicatorKind?
+    private var pendingEnableWiFiNetworkName = false
     private var pendingPermissions: [PermissionKind] = []
     private var pendingPermissionIndex = 0
 
     var onIndicatorEnabled: ((IndicatorKind) -> Void)?
     var onIndicatorDisabled: ((IndicatorKind) -> Void)?
+    var onWiFiNetworkNameEnabled: (() -> Void)?
+
+    func enableWiFiNetworkName(currentVisibility: inout [IndicatorKind: Bool]) {
+        pendingEnableIndicator = nil
+        pendingEnableWiFiNetworkName = true
+        pendingPermissions = Array(PermissionKind.requiredForEnabling(showWiFiNetworkName: true))
+            .sorted { $0.rawValue < $1.rawValue }
+        pendingPermissionIndex = 0
+        presentNextEducationOrProceed(currentVisibility: &currentVisibility)
+    }
 
     func setIndicatorVisibility(
         _ isVisible: Bool,
@@ -50,6 +61,7 @@ final class PermissionGateCoordinator: ObservableObject {
         }
 
         pendingEnableIndicator = kind
+        pendingEnableWiFiNetworkName = false
         pendingPermissions = required
         pendingPermissionIndex = 0
         presentNextEducationOrProceed(currentVisibility: &currentVisibility)
@@ -69,7 +81,9 @@ final class PermissionGateCoordinator: ObservableObject {
                 pendingAlert = PermissionAlertModel(
                     permission: permission,
                     title: permission.educationTitle,
-                    message: permission.educationMessage
+                    message: pendingEnableWiFiNetworkName && permission == .location
+                        ? "Showing your Wi-Fi network name requires Location Services. On iPhone, iPad and Apple Vision Pro, Precise Location must also be enabled. Basic Wi-Fi status works without location access."
+                        : permission.educationMessage
                 )
                 return
             }
@@ -89,23 +103,27 @@ final class PermissionGateCoordinator: ObservableObject {
     }
 
     func cancelEducation(currentVisibility: inout [IndicatorKind: Bool]) {
-        guard let kind = pendingEnableIndicator else {
-            pendingAlert = nil
-            return
-        }
+        let kind = pendingEnableIndicator
         pendingAlert = nil
         pendingEnableIndicator = nil
+        pendingEnableWiFiNetworkName = false
         pendingPermissions = []
         pendingPermissionIndex = 0
-        currentVisibility[kind] = false
+        if let kind { currentVisibility[kind] = false }
     }
 
     private func finishEnablingIndicator(currentVisibility: inout [IndicatorKind: Bool]) {
-        guard let kind = pendingEnableIndicator else { return }
+        let kind = pendingEnableIndicator
+        let enableWiFiName = pendingEnableWiFiNetworkName
         pendingEnableIndicator = nil
+        pendingEnableWiFiNetworkName = false
         pendingPermissions = []
         pendingPermissionIndex = 0
-        applyIndicatorEnable(kind, currentVisibility: &currentVisibility)
+        if enableWiFiName {
+            onWiFiNetworkNameEnabled?()
+        } else if let kind {
+            applyIndicatorEnable(kind, currentVisibility: &currentVisibility)
+        }
     }
 
     private func applyIndicatorEnable(

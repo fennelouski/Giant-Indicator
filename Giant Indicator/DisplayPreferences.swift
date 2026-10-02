@@ -8,7 +8,14 @@
 import Foundation
 
 enum DisplayPreferences {
-    static let defaults = UserDefaults.standard
+    static let defaults: UserDefaults = {
+        guard let suiteName = ProcessInfo.processInfo.environment["GIANT_INDICATOR_QA_DEFAULTS_SUITE"],
+              suiteName.hasPrefix("giant-indicator.qa."),
+              let suite = UserDefaults(suiteName: suiteName) else {
+            return .standard
+        }
+        return suite
+    }()
     private static let keepScreenOnKey = "display.keepScreenOn"
     private static let backgroundAppearanceKey = "display.backgroundAppearance"
     private static let batteryReflectiveBackgroundKey = "display.batteryReflectiveBackground"

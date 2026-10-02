@@ -39,7 +39,6 @@ enum PermissionKind: String, CaseIterable {
     }
 
     static func requiredForEnabling(showWiFiNetworkName: Bool) -> Set<PermissionKind> {
-        _ = showWiFiNetworkName
-        return []
+        showWiFiNetworkName ? [.location] : []
     }
 }
