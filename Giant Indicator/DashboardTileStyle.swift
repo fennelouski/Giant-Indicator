@@ -27,6 +27,7 @@ private struct DashboardTileContainerModifier: ViewModifier {
                             endPoint: .bottomTrailing
                         )
                     )
+                    .background(palette.background, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     .overlay {
                         if colorSchemeContrast == .increased {
                             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
