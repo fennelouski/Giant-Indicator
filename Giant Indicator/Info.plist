@@ -7,9 +7,9 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Bluetooth access is used to show whether Bluetooth is on or off in the Bluetooth indicator.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
+	<string>When you enable local weather or Wi-Fi network names, Giant Indicator uses location access for that feature.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is used to provide local weather conditions and forecasts in Giant Indicator.</string>
+	<string>When you enable local weather or Wi-Fi network names, Giant Indicator uses location access for that feature.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
