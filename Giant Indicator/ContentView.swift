@@ -90,6 +90,7 @@ struct ContentView: View {
                                 .frame(maxWidth: .infinity, alignment: .top)
                             }
                         }
+                        .frame(width: layout.contentWidth)
                         .padding(layout.outerPadding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: layout.layoutSignature)

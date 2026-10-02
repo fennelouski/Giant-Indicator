@@ -173,18 +173,83 @@ struct MasonryLayoutPlanTests {
         #expect(plan.fitsIn(size: size))
     }
 
-    @Test func singleIndicatorFillsAvailableVerticalSpace() async throws {
+    @Test func singleIndicatorUsesContentSizedReadableHeight() async throws {
         let size = CGSize(width: 393, height: 852)
-        let outerPadding: CGFloat = 20
-        let availableHeight = max(size.height - (outerPadding * 2), 1)
-        let indicators = [IndicatorPlaceholder(kind: .battery, value: "85%")]
-        let plan = MasonryLayoutPlan.build(indicators: indicators, in: size)
+        for kind in [IndicatorKind.clock, .battery] {
+            let plan = MasonryLayoutPlan.build(
+                indicators: [IndicatorPlaceholder(kind: kind, value: "12:30 PM")],
+                in: size
+            )
+            let items = indicatorItems(in: plan)
+            #expect(items.count == 1)
+            #expect(items[0].height >= 200)
+            #expect(items[0].height <= 320)
+            #expect(plan.fitsIn(size: size))
+            #expect(plan.satisfiesReadableTileMetrics)
+        }
+    }
 
-        let items = indicatorItems(in: plan)
-        #expect(items.count == 1)
-        #expect(items[0].height >= availableHeight - 1)
-        #expect(plan.fitsIn(size: size))
-        #expect(plan.satisfiesReadableTileMetrics)
+    @Test func twoIndicatorsAdaptBetweenPhoneStackAndWidePanel() async throws {
+        let indicators = [
+            IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
+            IndicatorPlaceholder(kind: .date, value: "Wednesday, June 3")
+        ]
+        let phoneSize = CGSize(width: 393, height: 852)
+        let phone = MasonryLayoutPlan.build(indicators: indicators, in: phoneSize)
+        #expect(phone.columns.count == 1)
+        #expect(indicatorItems(in: phone).count == 2)
+        #expect(phone.fitsIn(size: phoneSize))
+        #expect(phone.satisfiesReadableTileMetrics)
+        let phoneHeights = indicatorItems(in: phone).map(\.height)
+        #expect((phoneHeights.max() ?? 0) / (phoneHeights.min() ?? 1) <= 1.3)
+
+        for size in [CGSize(width: 1024, height: 1366), CGSize(width: 1600, height: 1000)] {
+            let plan = MasonryLayoutPlan.build(indicators: indicators, in: size)
+            #expect(plan.columns.count == 2)
+            #expect(plan.contentWidth <= 1040)
+            #expect(indicatorItems(in: plan).allSatisfy { $0.height >= 280 && $0.height <= 360 })
+            #expect(plan.fitsIn(size: size))
+            #expect(plan.satisfiesReadableTileMetrics)
+        }
+    }
+
+    @Test func sparseWideLayoutsUseAllColumnsWithoutStretching() async throws {
+        let size = CGSize(width: 1600, height: 1000)
+        let one = MasonryLayoutPlan.build(
+            indicators: [IndicatorPlaceholder(kind: .clock, value: "12:30 PM")],
+            in: size
+        )
+        #expect(one.contentWidth <= 720)
+        #expect(indicatorItems(in: one).allSatisfy { $0.height >= 280 && $0.height <= 360 })
+
+        let three = MasonryLayoutPlan.build(indicators: [
+            IndicatorPlaceholder(kind: .clock, value: "12:30 PM"),
+            IndicatorPlaceholder(kind: .date, value: "Wednesday, June 3"),
+            IndicatorPlaceholder(kind: .volume, value: "30%")
+        ], in: size)
+        #expect(three.contentWidth <= 1120)
+        #expect(three.columns.count >= 2)
+        #expect(indicatorItems(in: three).count == 3)
+        #expect(three.columns.allSatisfy { !$0.items.isEmpty })
+        #expect(three.fitsIn(size: size))
+        #expect(three.satisfiesReadableTileMetrics)
+
+        let landscapeSize = CGSize(width: 852, height: 393)
+        let paired = MasonryLayoutPlan.build(indicators: [
+            IndicatorPlaceholder(kind: .battery, value: "50%"),
+            IndicatorPlaceholder(kind: .chargingState, value: "Charging"),
+            IndicatorPlaceholder(kind: .clock, value: "12:30 PM")
+        ], in: landscapeSize)
+        let batteryColumn = paired.columns.firstIndex { $0.items.contains { $0.id == .battery } }
+        let chargingColumn = paired.columns.firstIndex { $0.items.contains { $0.id == .chargingState } }
+        #expect(
+            batteryColumn != nil && chargingColumn != nil && batteryColumn != chargingColumn,
+            "Landscape columns: \(paired.columns.map { $0.items.map { "\($0.id):\($0.width)x\($0.height)" } })"
+        )
+        #expect(paired.columns.allSatisfy { !$0.items.isEmpty })
+        #expect(indicatorItems(in: paired).count == 3)
+        #expect(paired.fitsIn(size: landscapeSize))
+        #expect(paired.satisfiesReadableTileMetrics)
     }
 
     private func indicatorItems(in plan: MasonryLayoutPlan) -> [MasonryLayoutPlan.Item] {

@@ -38,6 +38,12 @@ struct TileMetrics {
     }
 
     func minimumContentHeight(for kind: IndicatorKind, showsKindLabel: Bool) -> CGFloat {
+        if kind == .clock {
+            return padding * 2 + clockTimeFontSize * 1.2
+        }
+        if kind == .date {
+            return padding * 2 + dateTextFontSize * 2.2
+        }
         var stack = baseMinimumContentStack(for: kind)
 
         if showsKindLabel && TileKindLabelVisibility.strippingOrder.contains(kind) {
@@ -79,11 +85,11 @@ struct TileMetrics {
     }
 
     var contentSpacing: CGFloat {
-        clamp(compactDimension * 0.1, min: boundedMin(10, 0.06), max: min(24, height * 0.12))
+        clamp(compactDimension * 0.08, min: boundedMin(8, 0.05), max: min(16, height * 0.1))
     }
 
     var padding: CGFloat {
-        clamp(compactDimension * 0.12, min: boundedMin(16, 0.1), max: min(30, height * 0.14))
+        clamp(compactDimension * 0.1, min: boundedMin(12, 0.08), max: min(24, height * 0.12))
     }
 
     var iconHeight: CGFloat {
@@ -131,7 +137,7 @@ struct TileMetrics {
     }
 
     var cornerRadius: CGFloat {
-        clamp(compactDimension * 0.12, min: boundedMin(18, 0.1), max: min(30, height * 0.16))
+        clamp(compactDimension * 0.08, min: boundedMin(12, 0.08), max: min(20, height * 0.12))
     }
 
     /// Horizontal space available to the clock time label inside the tile.

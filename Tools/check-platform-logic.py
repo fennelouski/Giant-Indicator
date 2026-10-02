@@ -46,7 +46,7 @@ display_source = (ROOT / "Giant Indicator/DisplayPreferences.swift").read_text()
 pieces.append("enum DisplayPreferences {\n" + declaration(display_source, "static let defaults: UserDefaults =") + "()\n}")
 
 for filename, anchors in (
-    ("IndicatorFallbackPresentation.swift", ["protocol IndicatorUnavailablePresenting"]),
+    ("IndicatorFallbackPresentation.swift", ["enum IndicatorFallbackPresentation", "protocol IndicatorUnavailablePresenting"]),
     ("VolumeProvider.swift", ["enum VolumeSnapshotResolver"]),
     ("WeatherLocationProvider.swift", ["enum WeatherLocationResolution", "@MainActor\nfinal class WeatherLocationRequest"]),
 ):
@@ -71,8 +71,32 @@ checks = [
     .replace("#expect(", "check(")
     for method in methods
 ]
+layout_sources = (
+    "BatteryState.swift", "WeatherModels.swift", "ConnectivityState.swift", "WiFiIndicatorState.swift",
+    "IndicatorPlaceholder.swift", "TileKindLabelVisibility.swift", "TileMetrics.swift", "MasonryLayoutPlan.swift",
+)
+masonry_tests = (ROOT / "Giant IndicatorTests/MasonryLayoutPlanTests.swift").read_text()
+masonry_start = masonry_tests.index("struct MasonryLayoutPlanTests")
+masonry_line = masonry_tests[:masonry_start].count("\n") + 1
+pieces.append(f'#sourceLocation(file: "Giant IndicatorTests/MasonryLayoutPlanTests.swift", line: {masonry_line})')
+pieces.append(
+    declaration(masonry_tests, "struct MasonryLayoutPlanTests")
+    .replace("@Test func ", "func ")
+    .replace("#expect(", "Checks.check(")
+)
+pieces.append("#sourceLocation()\n")
+masonry_methods = (
+    "singleIndicatorUsesContentSizedReadableHeight",
+    "twoIndicatorsAdaptBetweenPhoneStackAndWidePanel",
+    "sparseWideLayoutsUseAllColumnsWithoutStretching",
+    "layoutFitsIPhonePortraitWithDefaultFavorites",
+    "layoutFitsIPhonePortraitWithAllIndicatorsReadable",
+    "layoutFitsIPadOneThirdSplitPortrait",
+    "layoutFitsMacOSSmallWindow",
+    "tightLayoutHidesMoreKindLabelsThanSpaciousLayout",
+)
 pieces.append("@main @MainActor struct Checks {\n")
-pieces.append("static func check(_ condition: Bool) { precondition(condition) }\n")
+pieces.append("static func check(_ condition: Bool, _ message: String = \"\", file: StaticString = #file, line: UInt = #line) { precondition(condition, message, file: file, line: line) }\n")
 pieces.extend(checks)
 background_source = (ROOT / "Giant Indicator/ContentView.swift").read_text()
 pieces.append('''
@@ -186,7 +210,8 @@ pieces.extend("try await " + method + "()\n" for method in methods)
 pieces.append("wifiNetworkNameGate_preservesOtherIndicators()\n")
 pieces.append("dashboardBackground_matchesVisibleTextPalette()\n")
 pieces.append("batteryMotion_respectsSystemPreference()\n")
-pieces.append('print("PASS: twelve checks: nine actual unit checks, Wi-Fi permission gate, exact production background contrast and Reduce Motion battery gating; no app, location manager or audio device instantiated")\n}\n}\n')
+pieces.extend("try await MasonryLayoutPlanTests()." + method + "()\n" for method in masonry_methods)
+pieces.append('print("PASS: twelve platform checks plus eight actual sparse/dense masonry regression methods; no app, location manager or audio device instantiated")\n}\n}\n')
 source = "\n".join(pieces)
 print("Extracted source SHA256", hashlib.sha256(source.encode()).hexdigest(), flush=True)
 with tempfile.TemporaryDirectory(prefix="giant-indicator-platform-check-") as directory:
@@ -195,7 +220,8 @@ with tempfile.TemporaryDirectory(prefix="giant-indicator-platform-check-") as di
     source_file.write_text(source)
     subprocess.run([
         "xcrun", "swiftc", "-swift-version", "5", "-parse-as-library",
-        "-default-isolation", "MainActor", str(source_file), "-o", str(executable),
+        "-default-isolation", "MainActor", str(source_file),
+        *(str(ROOT / "Giant Indicator" / name) for name in layout_sources), "-o", str(executable),
     ], check=True)
     environment = dict(os.environ, GIANT_INDICATOR_QA_DEFAULTS_SUITE="giant-indicator.qa." + str(uuid.uuid4()))
     subprocess.run([str(executable), "--ui-testing-force-permission-not-determined"], env=environment, check=True)

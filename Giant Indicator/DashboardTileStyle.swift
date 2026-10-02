@@ -17,24 +17,34 @@ private struct DashboardTileContainerModifier: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(palette.foreground(opacity: tileFillOpacity))
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                palette.foreground(opacity: tileFillOpacity),
+                                palette.foreground(opacity: tileFillOpacity * 0.55)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(palette.foreground(opacity: tileStrokeOpacity), lineWidth: tileStrokeWidth)
+                        if colorSchemeContrast == .increased {
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .stroke(palette.foreground(opacity: 0.58), lineWidth: 2)
+                        }
                     }
+                    .shadow(
+                        color: .black.opacity(colorSchemeContrast == .increased ? 0 : 0.1),
+                        radius: 12,
+                        x: 0,
+                        y: 5
+                    )
             }
     }
 
     private var tileFillOpacity: Double {
-        colorSchemeContrast == .increased ? 0.2 : 0.14
-    }
-
-    private var tileStrokeOpacity: Double {
-        colorSchemeContrast == .increased ? 0.58 : 0.4
-    }
-
-    private var tileStrokeWidth: CGFloat {
-        colorSchemeContrast == .increased ? 2 : 1.5
+        if colorSchemeContrast == .increased { return 0.2 }
+        return palette.foreground == .white ? 0.14 : 0.07
     }
 }
 

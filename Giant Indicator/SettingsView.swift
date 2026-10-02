@@ -135,12 +135,13 @@ struct SettingsView: View {
                                 Label(area.title, systemImage: area.symbol)
                                     .font(.body.weight(.medium))
                                     .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.vertical, 8)
+                                    .padding(.vertical, 4)
                                     .tag(area)
                             }
                         }
                         .listStyle(.sidebar)
-                        .frame(width: dynamicTypeSize.isAccessibilitySize ? 340 : 240)
+                        .environment(\.defaultMinListRowHeight, 44)
+                        .frame(width: dynamicTypeSize.isAccessibilitySize ? 340 : 220)
                         Divider()
                     }
                     settingsDetails(isWide: isWide)
@@ -153,7 +154,7 @@ struct SettingsView: View {
                             )
                             .background(.background)
                         }
-                        .frame(maxWidth: 760)
+                        .frame(maxWidth: 680)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -293,9 +294,14 @@ struct SettingsView: View {
                 indicatorVisibilitySection("Weather", group: .weather)
             }
         }
+        .environment(\.defaultMinListRowHeight, 44)
+        #if os(iOS) || os(visionOS)
+        .listSectionSpacing(.compact)
+        #endif
     }
 
     private var clockPreviewSection: some View {
+        let previewHeight: CGFloat = dynamicTypeSize.isAccessibilitySize ? 144 : 112
         let palette = DashboardPalette(colorScheme: backgroundAppearance.preferredColorScheme ?? colorScheme)
         let state = ClockState.current(
             at: Date(timeIntervalSinceReferenceDate: 36_572),
@@ -305,14 +311,16 @@ struct SettingsView: View {
             GeometryReader { geometry in
                 ClockIndicatorTile(
                     clockState: state,
-                    metrics: TileMetrics(width: geometry.size.width, height: 180)
+                    metrics: TileMetrics(width: geometry.size.width, height: previewHeight)
                 )
                 .environment(\.dashboardPalette, palette)
                 .allowsHitTesting(false)
                 .accessibilityLabel("Clock sample")
                 .accessibilityValue(state.timeText)
             }
-            .frame(height: 180)
+            .frame(maxWidth: 520)
+            .frame(height: previewHeight)
+            .frame(maxWidth: .infinity)
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
