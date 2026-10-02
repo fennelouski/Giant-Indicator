@@ -9,6 +9,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var activeArea: SettingsArea = .dashboard
     @Binding var indicatorVisibility: [IndicatorKind: Bool]
     @Binding var keepScreenOn: Bool
     @Binding var backgroundAppearance: DashboardBackgroundAppearance
@@ -20,13 +23,161 @@ struct SettingsView: View {
     let indicatorKinds: [IndicatorKind]
     let permissionGate: PermissionGateCoordinator
 
+    private enum SettingsArea: String, CaseIterable, Identifiable {
+        case dashboard, screen, battery, wifi, timeAndDate, media, connectivity, weather
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .dashboard: return "Dashboard"
+            case .screen: return "Screen"
+            case .battery: return "Battery"
+            case .wifi: return "Wi-Fi"
+            case .timeAndDate: return "Time & Date"
+            case .media: return "Media"
+            case .connectivity: return "Connectivity"
+            case .weather: return "Weather"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .dashboard: return "square.grid.2x2.fill"
+            case .screen: return "sun.max.fill"
+            case .battery: return "battery.100"
+            case .wifi: return "wifi"
+            case .timeAndDate: return "clock.fill"
+            case .media: return "play.fill"
+            case .connectivity: return "hifispeaker.fill"
+            case .weather: return "cloud.sun.fill"
+            }
+        }
+
+        var optionalGroup: SettingsGroup? {
+            switch self {
+            case .media: return .media
+            case .connectivity: return .connectivity
+            case .weather: return .weather
+            default: return nil
+            }
+        }
+    }
+
+    private var availableAreas: [SettingsArea] {
+        SettingsArea.allCases.filter { area in
+            guard let group = area.optionalGroup else { return true }
+            return !visibleKinds(in: group).isEmpty
+        }
+    }
+
     private var isClockIndicatorEnabled: Bool {
         indicatorVisibility[.clock, default: true]
     }
 
     var body: some View {
+        settingsPresentation
+            .accessibilityIdentifier("settings-view")
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 980, minHeight: 480, idealHeight: 720)
+            #endif
+    }
+
+    @ViewBuilder
+    private var settingsPresentation: some View {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            settingsNavigation.presentationSizing(.page)
+        } else {
+            settingsNavigation
+        }
+        #else
+        settingsNavigation
+        #endif
+    }
+
+    private var settingsNavigation: some View {
         NavigationStack {
-            List {
+            GeometryReader { geometry in
+                let isWide = geometry.size.width >= (dynamicTypeSize.isAccessibilitySize ? 1040 : 760)
+                HStack(spacing: 0) {
+                    if isWide {
+                        List(selection: Binding<SettingsArea?>(
+                            get: { activeArea },
+                            set: { if let area = $0 { activeArea = area } }
+                        )) {
+                            ForEach(availableAreas) { area in
+                                Label(area.title, systemImage: area.symbol)
+                                    .font(.body.weight(.medium))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.vertical, 8)
+                                    .tag(area)
+                            }
+                        }
+                        .listStyle(.sidebar)
+                        .frame(width: dynamicTypeSize.isAccessibilitySize ? 340 : 240)
+                        Divider()
+                    }
+                    settingsDetails(isWide: isWide)
+                        .scrollContentBackground(.hidden)
+                        .background {
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.10), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .background(.background)
+                        }
+                        .frame(maxWidth: 760)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onChange(of: availableAreas) { _, areas in
+            if !areas.contains(activeArea) {
+                activeArea = .dashboard
+            }
+        }
+    }
+
+    private func settingsDetails(isWide: Bool) -> some View {
+        List {
+            if !isWide {
+                Section("Section") {
+                    Menu {
+                        Picker("Section", selection: $activeArea) {
+                            ForEach(availableAreas) { area in
+                                Label(area.title, systemImage: area.symbol).tag(area)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Label(activeArea.title, systemImage: activeArea.symbol)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.down")
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.vertical, 6)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Settings section")
+                    .accessibilityValue(activeArea.title)
+                }
+            }
+            switch activeArea {
+            case .dashboard:
+                clockPreviewSection
                 Section("Dashboard") {
                     Picker(selection: $backgroundAppearance) {
                         ForEach(DashboardBackgroundAppearance.allCases) { appearance in
@@ -37,7 +188,7 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("display-picker-background-appearance")
                 }
-
+            case .screen:
                 Section {
                     Toggle(isOn: $keepScreenOn) {
                         Label("Keep Screen On", systemImage: "sun.max.fill")
@@ -56,7 +207,7 @@ struct SettingsView: View {
                         Text(StatusBarVisibilityControl.unavailableReason)
                     }
                 }
-
+            case .battery:
                 Section {
                     Toggle(isOn: $batteryReflectiveBackground) {
                         Label("Battery-Reactive Background", systemImage: "battery.100")
@@ -77,7 +228,7 @@ struct SettingsView: View {
                         Text(ScreenBrightnessControl.unavailableReason)
                     }
                 }
-
+            case .wifi:
                 Section("Wi-Fi") {
                     Toggle(isOn: $showWiFiNetworkName) {
                         Label("Show Wi-Fi Network Name", systemImage: "wifi")
@@ -86,7 +237,8 @@ struct SettingsView: View {
 
                     indicatorVisibilityToggles(for: .wifi)
                 }
-
+            case .timeAndDate:
+                clockPreviewSection
                 Section("Time & Date") {
                     Toggle(isOn: $showClockSeconds) {
                         Label("Show Seconds on Clock", systemImage: "clock.badge")
@@ -96,21 +248,45 @@ struct SettingsView: View {
 
                     indicatorVisibilityToggles(for: .timeAndDate)
                 }
-
+            case .media:
                 indicatorVisibilitySection("Media", group: .media)
+            case .connectivity:
                 indicatorVisibilitySection("Connectivity", group: .connectivity)
+            case .weather:
                 indicatorVisibilitySection("Weather", group: .weather)
             }
-            .navigationTitle("Settings")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
-        .accessibilityIdentifier("settings-view")
+    }
+
+    private var clockPreviewSection: some View {
+        let palette = DashboardPalette(colorScheme: backgroundAppearance.preferredColorScheme ?? colorScheme)
+        let state = ClockState.current(
+            at: Date(timeIntervalSinceReferenceDate: 36_572),
+            showsSeconds: showClockSeconds
+        )
+        return Section {
+            GeometryReader { geometry in
+                ClockIndicatorTile(
+                    clockState: state,
+                    metrics: TileMetrics(width: geometry.size.width, height: 180)
+                )
+                .environment(\.dashboardPalette, palette)
+                .background(palette.background)
+                .allowsHitTesting(false)
+                .accessibilityLabel("Clock sample")
+                .accessibilityValue(state.timeText)
+            }
+            .frame(height: 180)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+        } header: {
+            Text("Clock preview")
+        } footer: {
+            Text(batteryReflectiveBackground
+                 ? "Sample time and base background. Battery-reactive brightness isn’t shown."
+                 : "Sample time.")
+        }
     }
 
     @ViewBuilder
